@@ -1,4 +1,4 @@
-use crate::error::{Result, Error};
+use crate::error::{Error, Result};
 use crate::resolve;
 use std::collections::HashMap;
 use tourist_types::{Index, Stop, Tour};
@@ -18,7 +18,7 @@ fn stop_to_markdown(
     if let Some((index, above, below)) = ctx_args {
         let repo_path = index
             .get(&stop.repository)
-            .ok_or(Error::NotInIndex(stop.repository.clone()))?;
+            .ok_or_else(|| Error::NotInIndex(stop.repository.clone()))?;
 
         let low = stop.line - above;
         let hi = stop.line + below;
@@ -26,7 +26,7 @@ fn stop_to_markdown(
             repo_path.as_absolute_path(),
             commit_map
                 .get(&stop.repository)
-                .ok_or(Error::NoCommitForRepository(stop.repository.to_owned()))?,
+                .ok_or_else(|| Error::NoCommitForRepository(stop.repository.to_owned()))?,
             &stop.path,
         )?
         .lines()
@@ -34,7 +34,7 @@ fn stop_to_markdown(
         .filter_map(|(i, e)| {
             if i + 1 == stop.line {
                 Some(format!(" -> {}", e))
-            } else if low <= i + 1 && i + 1 <= hi {
+            } else if low <= i + 1 && i < hi {
                 Some(format!("    {}", e))
             } else {
                 None

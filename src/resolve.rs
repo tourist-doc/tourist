@@ -1,4 +1,4 @@
-use crate::error::{Result, Error};
+use crate::error::{Error, Result};
 use git2::Repository;
 use tourist_types::path::{AbsolutePath, RelativePathBuf};
 

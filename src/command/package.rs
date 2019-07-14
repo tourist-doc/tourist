@@ -1,4 +1,4 @@
-use crate::error::{Result, Error};
+use crate::error::{Error, Result};
 use crate::resolve;
 use std::collections::HashSet;
 use std::fs::File;
@@ -23,11 +23,11 @@ pub fn package_tour(zip_path: &Path, index: Index, tour: Tour, tour_source: &str
         let content = resolve::lookup_file_bytes(
             index
                 .get(&repository)
-                .ok_or(Error::NotInIndex(repository.clone()))?
+                .ok_or_else(|| Error::NotInIndex(repository.clone()))?
                 .as_absolute_path(),
             tour.repositories
                 .get(&repository)
-                .ok_or(Error::NoCommitForRepository(repository.clone()))?,
+                .ok_or_else(|| Error::NoCommitForRepository(repository.clone()))?,
             &path,
         )?;
         let mut file = PathBuf::from(&repository);
@@ -35,14 +35,14 @@ pub fn package_tour(zip_path: &Path, index: Index, tour: Tour, tour_source: &str
 
         zip.start_file(
             file.to_str()
-                .ok_or(Error::IO(io::Error::from(io::ErrorKind::Other)))?,
+                .ok_or_else(|| Error::IO(io::Error::from(io::ErrorKind::Other)))?,
             options,
         )?;
-        zip.write(&content)?;
+        let _ = zip.write(&content)?;
     }
 
     zip.start_file("tour.tour", options)?;
-    zip.write(tour_source.as_bytes())?;
+    let _ = zip.write(tour_source.as_bytes())?;
 
     Ok(())
 }

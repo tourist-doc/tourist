@@ -5,8 +5,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 use structopt::StructOpt;
-use tourist_types::Index;
 use tourist_types::path::AbsolutePathBuf;
+use tourist_types::Index;
 
 mod command;
 mod error;
@@ -38,7 +38,7 @@ fn get_override_config() -> Option<PathBuf> {
 }
 
 fn get_index() -> Result<Index> {
-    let path = get_override_config().or(get_default_config());
+    let path = get_override_config().or_else(get_default_config);
     Ok(match path {
         None => HashMap::new(),
         Some(path) => {
@@ -123,7 +123,7 @@ fn run() -> Result<()> {
             let tour_source = fs::read_to_string(args.tour_file)?;
             let tour = parse_tour(&tour_source)?;
             command::package(
-                &PathBuf::from(args.out.unwrap_or(PathBuf::from("out.tour.pkg"))),
+                &args.out.unwrap_or_else(|| PathBuf::from("out.tour.pkg")),
                 get_index()?,
                 tour,
                 &tour_source,
