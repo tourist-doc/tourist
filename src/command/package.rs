@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
-use crate::resolve;
 use crate::types::{Index, Tour};
+use crate::vcs::VCS;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io;
@@ -8,13 +8,14 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use zip;
 
-pub struct Package {
+pub struct Package<V: VCS> {
+    vcs: V,
     index: Index,
 }
 
-impl Package {
-    pub fn new(index: Index) -> Self {
-        Package { index }
+impl<V: VCS> Package<V> {
+    pub fn new(vcs: V, index: Index) -> Self {
+        Package { vcs, index }
     }
 
     pub fn process(&self, zip_path: &Path, tour: Tour, tour_source: &str) -> Result<()> {
@@ -29,7 +30,7 @@ impl Package {
         }
 
         for (repository, path) in files {
-            let content = resolve::lookup_file_bytes(
+            let content = self.vcs.lookup_file_bytes(
                 self.index
                     .get(&repository)
                     .ok_or_else(|| Error::NotInIndex(repository.clone()))?

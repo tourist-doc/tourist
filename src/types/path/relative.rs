@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub type Component = String;
 
@@ -30,6 +30,24 @@ impl From<String> for RelativePathBuf {
                 Some(x.to_owned())
             }
         }))
+    }
+}
+
+impl From<PathBuf> for RelativePathBuf {
+    fn from(p: PathBuf) -> Self {
+        RelativePathBuf::from_components(
+            p.components()
+                .filter_map(|c| c.as_os_str().to_str().map(|x| x.to_owned())),
+        )
+    }
+}
+
+impl From<&Path> for RelativePathBuf {
+    fn from(p: &Path) -> Self {
+        RelativePathBuf::from_components(
+            p.components()
+                .filter_map(|c| c.as_os_str().to_str().map(|x| x.to_owned())),
+        )
     }
 }
 

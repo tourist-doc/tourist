@@ -8,15 +8,16 @@ use structopt::StructOpt;
 
 mod command;
 mod error;
-mod resolve;
 mod serialize;
 mod types;
+mod vcs;
 
 use command::{Dump, Package};
 use error::Result;
 use serialize::parse_tour;
 use types::path::AbsolutePathBuf;
 use types::Index;
+use vcs::Git;
 
 fn get_default_config() -> Option<PathBuf> {
     dirs::home_dir().and_then(|mut path| {
@@ -108,6 +109,7 @@ fn run(opts: TouristArgs) -> Result<()> {
             let tour = parse_tour(&fs::read_to_string(args.tour_file)?)?;
             if args.context {
                 Dump::with_context(
+                    Git,
                     get_index()?,
                     args.around.or(args.above).unwrap_or(0),
                     args.around.or(args.below).unwrap_or(0),
@@ -120,7 +122,7 @@ fn run(opts: TouristArgs) -> Result<()> {
         TouristArgs::Package(args) => {
             let tour_source = fs::read_to_string(args.tour_file)?;
             let tour = parse_tour(&tour_source)?;
-            Package::new(get_index()?).process(
+            Package::new(Git, get_index()?).process(
                 &args.out.unwrap_or_else(|| PathBuf::from("out.tour.pkg")),
                 tour,
                 &tour_source,

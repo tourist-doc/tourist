@@ -1,9 +1,10 @@
 use crate::error::{Error, Result};
-use crate::resolve;
 use crate::types::{Index, Stop, Tour};
+use crate::vcs::VCS;
 
-pub enum Dump {
+pub enum Dump<V: VCS> {
     Context {
+        vcs: V,
         index: Index,
         above: usize,
         below: usize,
@@ -29,13 +30,14 @@ fn code_range(code: String, target: usize, above: usize, below: usize) -> String
         .join("\n")
 }
 
-impl Dump {
+impl<V: VCS> Dump<V> {
     pub fn new() -> Self {
         Dump::NoContext
     }
 
-    pub fn with_context(index: Index, above: usize, below: usize) -> Self {
+    pub fn with_context(vcs: V, index: Index, above: usize, below: usize) -> Self {
         Dump::Context {
+            vcs,
             index,
             above,
             below,
@@ -45,6 +47,7 @@ impl Dump {
     fn extract_context(&self, stop: &Stop, commit: &str) -> Result<String> {
         match self {
             Dump::Context {
+                vcs,
                 index,
                 above,
                 below,
@@ -54,11 +57,7 @@ impl Dump {
                     .ok_or_else(|| Error::NotInIndex(stop.repository.clone()))?;
 
                 let content = code_range(
-                    resolve::lookup_file_contents(
-                        repo_path.as_absolute_path(),
-                        commit,
-                        &stop.path,
-                    )?,
+                    vcs.lookup_file_contents(repo_path.as_absolute_path(), commit, &stop.path)?,
                     stop.line,
                     *above,
                     *below,
