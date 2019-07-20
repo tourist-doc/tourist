@@ -1,48 +1,58 @@
 use crate::error::{Error, Result};
 use crate::resolve;
+use crate::types::{Index, Tour};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use tourist_types::{Index, Tour};
 use zip;
 
-pub fn package_tour(zip_path: &Path, index: Index, tour: Tour, tour_source: &str) -> Result<()> {
-    let f = File::create(zip_path)?;
-    let mut zip = zip::ZipWriter::new(f);
-    let options =
-        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+pub struct Package {
+    index: Index,
+}
 
-    let mut files = HashSet::new();
-    for stop in tour.stops {
-        files.insert((stop.repository, stop.path));
+impl Package {
+    pub fn new(index: Index) -> Self {
+        Package { index }
     }
 
-    for (repository, path) in files {
-        let content = resolve::lookup_file_bytes(
-            index
-                .get(&repository)
-                .ok_or_else(|| Error::NotInIndex(repository.clone()))?
-                .as_absolute_path(),
-            tour.repositories
-                .get(&repository)
-                .ok_or_else(|| Error::NoCommitForRepository(repository.clone()))?,
-            &path,
-        )?;
-        let mut file = PathBuf::from(&repository);
-        file.push(path.as_path_buf());
+    pub fn process(&self, zip_path: &Path, tour: Tour, tour_source: &str) -> Result<()> {
+        let f = File::create(zip_path)?;
+        let mut zip = zip::ZipWriter::new(f);
+        let options =
+            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
-        zip.start_file(
-            file.to_str()
-                .ok_or_else(|| Error::IO(io::Error::from(io::ErrorKind::Other)))?,
-            options,
-        )?;
-        let _ = zip.write(&content)?;
+        let mut files = HashSet::new();
+        for stop in tour.stops {
+            files.insert((stop.repository, stop.path));
+        }
+
+        for (repository, path) in files {
+            let content = resolve::lookup_file_bytes(
+                self.index
+                    .get(&repository)
+                    .ok_or_else(|| Error::NotInIndex(repository.clone()))?
+                    .as_absolute_path(),
+                tour.repositories
+                    .get(&repository)
+                    .ok_or_else(|| Error::NoCommitForRepository(repository.clone()))?,
+                &path,
+            )?;
+            let mut file = PathBuf::from(&repository);
+            file.push(path.as_path_buf());
+
+            zip.start_file(
+                file.to_str()
+                    .ok_or_else(|| Error::IO(io::Error::from(io::ErrorKind::Other)))?,
+                options,
+            )?;
+            let _ = zip.write(&content)?;
+        }
+
+        zip.start_file("tour.tour", options)?;
+        let _ = zip.write(tour_source.as_bytes())?;
+
+        Ok(())
     }
-
-    zip.start_file("tour.tour", options)?;
-    let _ = zip.write(tour_source.as_bytes())?;
-
-    Ok(())
 }

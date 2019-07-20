@@ -20,5 +20,3 @@ structopt = { version = "0.2", default-features = false }
 git2 = "0.9"
 dirs = "2.0"
 zip = "0.5"
-tourist-types = "0.1.0"
-tourist-serde = "0.1.1"

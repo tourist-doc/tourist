@@ -5,15 +5,18 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 use structopt::StructOpt;
-use tourist_types::path::AbsolutePathBuf;
-use tourist_types::Index;
 
 mod command;
 mod error;
 mod resolve;
+mod serialize;
+mod types;
 
+use command::{Dump, Package};
 use error::Result;
-use tourist_serde::parse_tour;
+use serialize::parse_tour;
+use types::path::AbsolutePathBuf;
+use types::Index;
 
 fn get_default_config() -> Option<PathBuf> {
     dirs::home_dir().and_then(|mut path| {
@@ -99,32 +102,26 @@ enum TouristArgs {
     Package(PackageArgs),
 }
 
-fn run() -> Result<()> {
-    let opts = TouristArgs::from_args();
-
+fn run(opts: TouristArgs) -> Result<()> {
     match opts {
         TouristArgs::Dump(args) => {
             let tour = parse_tour(&fs::read_to_string(args.tour_file)?)?;
             if args.context {
-                let index = get_index()?;
-                command::dump(
-                    &Some((
-                        &index,
-                        args.around.or(args.above).unwrap_or(0),
-                        args.around.or(args.below).unwrap_or(0),
-                    )),
-                    &tour,
+                Dump::with_context(
+                    get_index()?,
+                    args.around.or(args.above).unwrap_or(0),
+                    args.around.or(args.below).unwrap_or(0),
                 )
             } else {
-                command::dump(&None, &tour)
-            }?;
+                Dump::new()
+            }
+            .process(&tour)?;
         }
         TouristArgs::Package(args) => {
             let tour_source = fs::read_to_string(args.tour_file)?;
             let tour = parse_tour(&tour_source)?;
-            command::package(
+            Package::new(get_index()?).process(
                 &args.out.unwrap_or_else(|| PathBuf::from("out.tour.pkg")),
-                get_index()?,
                 tour,
                 &tour_source,
             )?;
@@ -135,7 +132,7 @@ fn run() -> Result<()> {
 }
 
 fn main() {
-    if let Err(e) = run() {
+    if let Err(e) = run(TouristArgs::from_args()) {
         eprintln!("{}", e);
         process::exit(1);
     }

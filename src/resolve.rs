@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
+use crate::types::path::{AbsolutePath, RelativePathBuf};
 use git2::Repository;
-use tourist_types::path::{AbsolutePath, RelativePathBuf};
 
 pub fn lookup_file_bytes(
     repo_path: AbsolutePath<'_>,
