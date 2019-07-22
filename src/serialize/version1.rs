@@ -81,7 +81,7 @@ impl Into<types::Tour> for TourFile {
                         .into_iter()
                         .map(|c| types::StopReference {
                             tour_id: c.tour_id,
-                            stop_id: "".to_owned(),
+                            stop_id: None,
                         })
                         .collect::<Vec<_>>(),
                 })

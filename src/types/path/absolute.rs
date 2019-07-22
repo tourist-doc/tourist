@@ -1,6 +1,8 @@
+use super::RelativePathBuf;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-#[derive(PartialEq, Eq)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct AbsolutePathBuf(PathBuf);
 
 impl AbsolutePathBuf {
@@ -14,6 +16,10 @@ impl AbsolutePathBuf {
 
     pub fn as_absolute_path(&self) -> AbsolutePath<'_> {
         AbsolutePath(&self.0)
+    }
+
+    pub fn try_relative(&self, _root: AbsolutePath<'_>) -> Option<RelativePathBuf> {
+        unimplemented!();
     }
 }
 

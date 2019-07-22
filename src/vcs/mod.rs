@@ -8,13 +8,6 @@ pub use changes::Changes;
 use changes::{DiffFileEvent, DiffLineEvent};
 
 pub trait VCS {
-    fn lookup_file_bytes(
-        &self,
-        repo_path: AbsolutePath<'_>,
-        commit: &str,
-        file_path: &RelativePathBuf,
-    ) -> Result<Vec<u8>>;
-
     fn diff_with_version(
         &self,
         repo_path: AbsolutePath<'_>,
@@ -23,6 +16,13 @@ pub trait VCS {
     ) -> Result<Changes>;
 
     fn diff_with_worktree(&self, repo_path: AbsolutePath<'_>, from: &str) -> Result<Changes>;
+
+    fn lookup_file_bytes(
+        &self,
+        repo_path: AbsolutePath<'_>,
+        commit: &str,
+        file_path: &RelativePathBuf,
+    ) -> Result<Vec<u8>>;
 
     fn lookup_file_contents(
         &self,
@@ -150,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn figure_out_diff() {
+    fn simple_diffs_work() {
         let repo_dir = TempDir::new("my_repo").unwrap().into_path();
         let repo = Repository::init(&repo_dir).unwrap();
 
@@ -181,8 +181,9 @@ mod tests {
 
         assert_eq!(
             Some(&FileChanges::Changed {
-                deletions: vec![2].into_iter().collect(),
                 changes: vec![(1, 2)].into_iter().collect(),
+                additions: vec![1, 3].into_iter().collect(),
+                deletions: vec![2].into_iter().collect(),
             }),
             changes.for_file(&RelativePathBuf::from(Path::new("test.txt")))
         )

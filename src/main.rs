@@ -12,7 +12,8 @@ mod serialize;
 mod types;
 mod vcs;
 
-use command::{Dump, Package};
+use command::{Dump, Package, Serve};
+pub use command::{StopMetadata, StopReferenceView, StopView, TourMetadata, TourView, TouristRpc};
 use error::Result;
 use serialize::parse_tour;
 use types::path::AbsolutePathBuf;
@@ -89,6 +90,9 @@ struct PackageArgs {
 }
 
 #[derive(StructOpt)]
+struct ServeArgs {}
+
+#[derive(StructOpt)]
 #[structopt(
     name = "tourist",
     about = "A CLI tool for the tourist documentation system."
@@ -101,6 +105,11 @@ enum TouristArgs {
         about = "Package a tour file for viewing on the web."
     )]
     Package(PackageArgs),
+    #[structopt(
+        name = "serve",
+        about = "Start a JSON-RPC 2.0 that implements the tourist protocol."
+    )]
+    Serve(ServeArgs),
 }
 
 fn run(opts: TouristArgs) -> Result<()> {
@@ -127,6 +136,9 @@ fn run(opts: TouristArgs) -> Result<()> {
                 tour,
                 &tour_source,
             )?;
+        }
+        TouristArgs::Serve(_) => {
+            Serve::new().process();
         }
     }
 
