@@ -76,6 +76,19 @@ pub struct TourView {
 /// The provided endpoints should be all you need to create a rich extension to any modern editor.
 /// The server handles file IO, complex state, and other potential sources of complexity, allowing
 /// your editor plugin to be simple and straightforward.
+///
+/// # API Usage
+/// A JSONRPC 2.0 call looks like:
+/// ```json
+/// {
+///     "jsonrpc": "2.0",
+///     "method": "<method_name>",
+///     "params": [<param_1>, <param_2>, ...],
+///     "id": <id_number>
+/// }
+/// ```
+/// The ID number simply identifies a call so the response can be matched accordingly. You can read
+/// more about JSONRPC 2.0 [here](https://www.jsonrpc.org/specification).
 #[rpc]
 pub trait TouristRpc {
     /// List all tours that are currently open, along with their titles.
