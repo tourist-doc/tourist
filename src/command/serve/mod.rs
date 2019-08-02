@@ -4,9 +4,7 @@ use crate::types::{Index, Stop, Tour};
 use failure::{Fail, ResultExt};
 use jsonrpc_core;
 use jsonrpc_core::Result as JsonResult;
-use jsonrpc_derive::rpc;
 use jsonrpc_stdio_server::ServerBuilder;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -14,18 +12,9 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use uuid::Uuid;
 
 mod error;
+mod interface;
 use error::{AsJsonResult, ErrorKind};
-
-type TourId = String;
-type StopId = String;
-
-/// Metadata for a tour stop.
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct StopMetadata {
-    pub title: Option<String>,
-    pub description: Option<String>,
-}
+pub use interface::*;
 
 impl StopMetadata {
     fn apply_to(mut self, stop: &mut Stop) {
@@ -38,45 +27,6 @@ impl StopMetadata {
     }
 }
 
-/// A view of a tour stop reference.
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub enum StopReferenceView {
-    /// The linked tour is available in the tracker, so tour and stop titles can be provided.
-    Tracked {
-        tour_id: String,
-        tour_title: String,
-        /// Null if the reference links to the root of the tour.
-        stop_id: Option<String>,
-        /// Null if the reference links to the root of the tour.
-        stop_title: Option<String>,
-    },
-    /// The linked tour is unavailable.
-    Untracked {
-        tour_id: String,
-        /// Null if the reference links to the root of the tour.
-        stop_id: Option<String>,
-    },
-}
-
-/// A view of a tour stop.
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct StopView {
-    pub title: String,
-    pub description: String,
-    pub repository: String,
-    pub children: Vec<StopReferenceView>,
-}
-
-/// Metadata for a tour.
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct TourMetadata {
-    pub title: Option<String>,
-    pub description: Option<String>,
-}
-
 impl TourMetadata {
     fn apply_to(mut self, tour: &mut Tour) {
         if let Some(title) = self.title.take() {
@@ -86,20 +36,6 @@ impl TourMetadata {
             tour.description = description;
         }
     }
-}
-
-/// A view of a tour.
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct TourView {
-    pub title: String,
-    pub description: String,
-    /// A list of pairs containing `(stop_id, stop_title)`.
-    pub stops: Vec<(StopId, String)>,
-    /// A list of pairs containing `(repository_name, commit)`.
-    pub repositories: Vec<(String, String)>,
-    /// True if tour is currently in edit mode.
-    pub edit: bool,
 }
 
 fn find_path_in_context(
@@ -116,96 +52,9 @@ fn find_path_in_context(
     Err(ErrorKind::PathNotInIndex { path })
 }
 
-/// The main RPC interface provided by `tourist serve`.
-///
-/// Running `tourist serve` will provide a JSONRPC 2.0 interface via stdio. Interacting with the
-/// API is much the same as interacting with a Language Server operating on the
-/// [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
-///
-/// The provided endpoints should be all you need to create a rich extension to any modern editor.
-/// The server handles file IO, complex state, and other potential sources of complexity, allowing
-/// your editor plugin to be simple and straightforward.
-#[rpc]
-pub trait TouristRpc {
-    /// List all tours that are currently open, along with their titles.
-    fn list_tours(&self) -> JsonResult<Vec<(TourId, String)>>;
+type Tracker = HashMap<TourId, Tour>;
 
-    /// Create a new tour and open it in edit mode. Returns the new tour's ID.
-    fn create_tour(&self, title: String) -> JsonResult<TourId>;
-
-    /// Open an existing tour from disk. If `edit` is true, the tour will be available for editing.
-    /// Returns the opened tour's ID.
-    fn open_tour(&self, path: PathBuf, edit: bool) -> JsonResult<TourId>;
-
-    /// Set whether or not a tour is in edit mode.
-    fn set_tour_edit(&self, tour_id: TourId, edit: bool) -> JsonResult<()>;
-
-    /// View all of the top-level data for a tour.
-    fn view_tour(&self, tour_id: TourId) -> JsonResult<TourView>;
-
-    /// Edit tour metadata, e.g. title and description. The delta object has a number of optional
-    /// fields; those that are set will be applied.
-    fn edit_tour_metadata(&self, tour_id: TourId, delta: TourMetadata) -> JsonResult<()>;
-
-    /// Remove a tour from the list of tracked tours. If you would like to delete the tour from disk
-    /// as well, use `delete_tour`.
-    fn forget_tour(&self, tour_id: TourId) -> JsonResult<()>;
-
-    /// Create a new stop in the given tour. Returns the ID of the new stop.
-    fn create_stop(
-        &self,
-        tour_id: TourId,
-        title: String,
-        path: String,
-        line: usize,
-    ) -> JsonResult<StopId>;
-
-    /// View all of the top-level data for a stop.
-    fn view_stop(&self, tour_id: TourId, stop_id: StopId) -> JsonResult<StopView>;
-
-    /// Edit stop metadata, e.g. title and description. The delta object has a number of optional
-    /// fields; those that are set will be applied.
-    fn edit_stop_metadata(
-        &self,
-        tour_id: TourId,
-        stop_id: StopId,
-        delta: StopMetadata,
-    ) -> JsonResult<()>;
-
-    /// Find the file location for a given stop. If `naive` is set, the location will be provided
-    /// directly from the tour file, with no adjustment; otherwise the location will be adjusted
-    /// based on a git diff.
-    fn locate_stop(
-        &self,
-        tour_id: TourId,
-        stop_id: StopId,
-        naive: bool,
-    ) -> JsonResult<Option<(PathBuf, usize)>>;
-
-    /// Remove a stop from an open tour.
-    fn remove_stop(&self, tour_id: TourId, stop_id: StopId) -> JsonResult<()>;
-
-    /// Refresh a tour's stops to the provided commit. If no commit is provided, HEAD is used.
-    fn refresh_tour(&self, tour_id: TourId, commit: Option<String>) -> JsonResult<()>;
-
-    /// Save a tour to disk. If the tour is new, a path must be provided; otherwise the path can be
-    /// left empty.
-    fn save_tour(&self, tour_id: TourId, path: Option<PathBuf>) -> JsonResult<()>;
-
-    /// Save all available tours to disk. This will fail if any tours are new.
-    fn save_all(&self) -> JsonResult<()>;
-
-    /// Remove a tour from the tracker and delete it from disk.
-    fn delete_tour(&self, tour_id: TourId) -> JsonResult<()>;
-
-    /// Update the repository index, mapping a name to a path. If a null value is passed instead of
-    /// a path, the name is removed from the index instead.
-    fn index_repository(&self, repo_name: String, path: Option<PathBuf>) -> JsonResult<()>;
-}
-
-pub type Tracker = HashMap<TourId, Tour>;
-
-pub struct Tourist {
+struct Tourist {
     index: Arc<RwLock<Index>>,
     tours: Arc<RwLock<Tracker>>,
 }
