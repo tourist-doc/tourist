@@ -20,6 +20,10 @@ pub fn parse_tour<'a>(s: &'a str) -> Result<Tour, serde_json::Error> {
     })
 }
 
+pub fn serialize_tour(tour: Tour) -> Result<String, serde_json::Error> {
+    serde_json::to_string(&latest::TourFile::from(tour))
+}
+
 #[cfg(test)]
 mod tests {
     use super::latest;

@@ -1,20 +1,19 @@
-use crate::serialize::parse_tour;
 use crate::types::path::{AbsolutePathBuf, RelativePathBuf};
 use crate::types::{Index, Stop, Tour};
-use failure::{Fail, ResultExt};
 use jsonrpc_core;
 use jsonrpc_core::Result as JsonResult;
 use jsonrpc_stdio_server::ServerBuilder;
 use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use uuid::Uuid;
 
 mod error;
 mod interface;
-use error::{AsJsonResult, ErrorKind};
+mod io;
+use error::{AsJsonResult, ErrorKind, Result};
 pub use interface::*;
+use io::{AsyncTourFileManager, TourFileManager};
 
 impl StopMetadata {
     fn apply_to(mut self, stop: &mut Stop) {
@@ -38,10 +37,7 @@ impl TourMetadata {
     }
 }
 
-fn find_path_in_context(
-    index: &Index,
-    path: String,
-) -> Result<(RelativePathBuf, String), impl Fail> {
+fn find_path_in_context(index: &Index, path: String) -> Result<(RelativePathBuf, String)> {
     let deep = AbsolutePathBuf::new(PathBuf::from(path.clone()))
         .ok_or_else(|| ErrorKind::ExpectedAbsolutePath { path: path.clone() })?;
     for (repo_name, repo_path) in index.iter() {
@@ -49,26 +45,18 @@ fn find_path_in_context(
             return Ok((rel, repo_name.to_owned()));
         }
     }
-    Err(ErrorKind::PathNotInIndex { path })
+    Err(ErrorKind::PathNotInIndex { path }.into())
 }
 
 type Tracker = HashMap<TourId, Tour>;
 
-struct Tourist {
+struct Tourist<M: TourFileManager> {
     index: Arc<RwLock<Index>>,
     tours: Arc<RwLock<Tracker>>,
+    manager: M,
 }
 
-impl Default for Tourist {
-    fn default() -> Tourist {
-        Tourist {
-            index: Arc::new(RwLock::new(HashMap::new())),
-            tours: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-}
-
-impl Tourist {
+impl<M: TourFileManager> Tourist<M> {
     /// Get a reference to the currently managed map of tours. In the event of a `PoisonError`, we
     /// panic.
     #[allow(dead_code)]
@@ -95,7 +83,7 @@ impl Tourist {
     }
 }
 
-impl TouristRpc for Tourist {
+impl<M: TourFileManager> TouristRpc for Tourist<M> {
     fn list_tours(&self) -> JsonResult<Vec<(TourId, String)>> {
         unimplemented!();
     }
@@ -116,12 +104,7 @@ impl TouristRpc for Tourist {
     }
 
     fn open_tour(&self, path: PathBuf, _edit: bool) -> JsonResult<TourId> {
-        let tour_source = fs::read_to_string(path)
-            .context(ErrorKind::FailedToReadTour)
-            .as_json_result()?;
-        let tour = parse_tour(&tour_source)
-            .context(ErrorKind::FailedToParseTour)
-            .as_json_result()?;
+        let tour = self.manager.load_tour(path).as_json_result()?;
         let mut tours = self.get_tours_mut();
         let id = tour.id.clone();
         tours.insert(tour.id.clone(), tour);
@@ -261,7 +244,9 @@ impl TouristRpc for Tourist {
         unimplemented!();
     }
 
-    fn save_tour(&self, _tour_id: TourId, _path: Option<PathBuf>) -> JsonResult<()> {
+    fn save_tour(&self, tour_id: TourId, _path: Option<PathBuf>) -> JsonResult<()> {
+        // TODO: Set path if necessary
+        self.manager.save_tour(tour_id).as_json_result()?;
         unimplemented!();
     }
 
@@ -279,20 +264,45 @@ impl Serve {
 
     pub fn process(&self) {
         let mut io = jsonrpc_core::IoHandler::new();
-        io.extend_with(Tourist::default().to_delegate());
+        let tours = Arc::new(RwLock::new(HashMap::new()));
+        let manager = AsyncTourFileManager::new(Arc::clone(&tours));
+        manager.start();
+        io.extend_with(
+            Tourist {
+                tours,
+                manager,
+                index: Arc::new(RwLock::new(HashMap::new())),
+            }
+            .to_delegate(),
+        );
         ServerBuilder::new(io).build();
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::io::mock::MockTourFileManager;
     use super::{Tourist, TouristRpc};
-    use std::fs;
-    use tempdir::TempDir;
+    use crate::types::Tour;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::{Arc, RwLock};
+
+    fn test_instance() -> (Tourist<MockTourFileManager>, MockTourFileManager) {
+        let manager = MockTourFileManager::new();
+        (
+            Tourist {
+                manager: manager.clone(),
+                tours: Arc::new(RwLock::new(HashMap::new())),
+                index: Arc::new(RwLock::new(HashMap::new())),
+            },
+            manager,
+        )
+    }
 
     #[test]
     fn create_tour_test() {
-        let tourist = Tourist::default();
+        let (tourist, _) = test_instance();
         let id = tourist
             .create_tour("My first tour".to_owned())
             .expect("Call to create failed");
@@ -304,16 +314,28 @@ mod tests {
 
     #[test]
     fn open_tour_test() {
-        let tour_file = TempDir::new("tours").unwrap().into_path().join("test.tour");
-        fs::write(&tour_file, include_str!("../../../data/empty-tour.tour"))
-            .expect("Failed to write to file");
+        let tour_file = PathBuf::from("some/path");
 
-        let tourist = Tourist::default();
+        let (tourist, manager) = test_instance();
+
+        manager.file_system.write().unwrap().insert(
+            tour_file.clone(),
+            Tour {
+                generator: 0,
+                id: "TOURID".to_owned(),
+                title: "My first tour".to_owned(),
+                description: "".to_owned(),
+                stops: vec![],
+                protocol_version: "1.0".to_owned(),
+                repositories: HashMap::new(),
+            },
+        );
+
         tourist
             .open_tour(tour_file, false)
             .expect("Call to open failed");
         let tours = tourist.tours.read().expect("Lock was poisoned");
-        let tour = tours.values().next().expect("No tours found");
+        let tour = tours.get("TOURID").expect("Tour not found");
         assert_eq!(tour.title, "My first tour");
         assert_eq!(tour.stops, vec![]);
     }

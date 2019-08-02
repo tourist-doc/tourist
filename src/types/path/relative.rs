@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 pub type Component = String;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct RelativePathBuf(Vec<Component>);
 
 impl RelativePathBuf {

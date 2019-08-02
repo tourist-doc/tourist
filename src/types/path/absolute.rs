@@ -2,7 +2,7 @@ use super::RelativePathBuf;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct AbsolutePathBuf(PathBuf);
 
 impl AbsolutePathBuf {

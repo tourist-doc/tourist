@@ -3,11 +3,13 @@ use jsonrpc_core::Result as JsonResult;
 use std::fmt;
 use std::fmt::Display;
 
+pub type Result<T> = std::result::Result<T, Error>;
+
 pub trait AsJsonResult<T> {
     fn as_json_result(self) -> JsonResult<T>;
 }
 
-impl<T, F: Fail> AsJsonResult<T> for Result<T, F> {
+impl<T, F: Fail> AsJsonResult<T> for std::result::Result<T, F> {
     fn as_json_result(self) -> JsonResult<T> {
         self.or_else(|e| {
             let mut err = jsonrpc_core::Error::internal_error();
@@ -31,6 +33,11 @@ pub enum ErrorKind {
         tour_id, stop_id
     )]
     NoStopFound { tour_id: String, stop_id: String },
+    #[fail(
+        display = "the tour with ID '{}' has not been saved and does not have a path",
+        id
+    )]
+    NoPathForTour { id: String },
     #[fail(display = "the given path '{}' is not absolute", path)]
     ExpectedAbsolutePath { path: String },
     #[fail(
@@ -40,8 +47,12 @@ pub enum ErrorKind {
     PathNotInIndex { path: String },
     #[fail(display = "could not read the provided tour file")]
     FailedToReadTour,
+    #[fail(display = "could not write the provided tour file")]
+    FailedToWriteTour,
     #[fail(display = "could not parse the provided tour file")]
     FailedToParseTour,
+    #[fail(display = "could not serialize the provided tour file")]
+    FailedToSerializeTour,
 }
 
 impl Fail for Error {
