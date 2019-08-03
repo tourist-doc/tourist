@@ -136,6 +136,16 @@ pub trait TouristRpc {
         delta: StopMetadata,
     ) -> JsonResult<()>;
 
+    /// Link a tour stop to another tour or tour stop. If `other_stop_id` is `None`, the link will
+    /// go to the tour's landing page. Otherwise the link will go to the stop itself.
+    fn link_stop(
+        &self,
+        tour_id: TourId,
+        stop_id: StopId,
+        other_tour_id: TourId,
+        other_stop_id: Option<StopId>,
+    ) -> JsonResult<()>;
+
     /// Find the file location for a given stop. If `naive` is set, the location will be provided
     /// directly from the tour file, with no adjustment; otherwise the location will be adjusted
     /// based on a git diff.

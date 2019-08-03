@@ -198,6 +198,16 @@ impl<M: TourFileManager> TouristRpc for Tourist<M> {
         Ok(())
     }
 
+    fn link_stop(
+        &self,
+        _tour_id: TourId,
+        _stop_id: StopId,
+        _other_tour_id: TourId,
+        _other_stop_id: Option<StopId>,
+    ) -> JsonResult<()> {
+        unimplemented!();
+    }
+
     fn locate_stop(
         &self,
         _tour_id: TourId,
