@@ -37,35 +37,20 @@ pub trait VCS {
 
 pub struct Git;
 
-impl VCS for Git {
-    fn lookup_file_bytes(
-        &self,
-        repo_path: AbsolutePath<'_>,
-        commit: &str,
-        file_path: &RelativePathBuf,
-    ) -> Result<Vec<u8>> {
-        let repo = Repository::open(repo_path.as_path())?;
-        let rev = format!("{}:{}", commit, file_path.as_git_path());
-        let obj = repo.revparse_single(&rev)?;
-        let blob = obj.as_blob().ok_or(Error::RevParse(rev))?;
-        Ok(blob.content().to_vec())
-    }
-
-    fn diff_with_version(
-        &self,
-        repo_path: AbsolutePath<'_>,
-        from: &str,
-        to: &str,
-    ) -> Result<Changes> {
+impl Git {
+    fn diff(&self, repo_path: AbsolutePath<'_>, from: &str, to: Option<&str>) -> Result<Changes> {
         let repo = Repository::open(repo_path.as_path())?;
         let from_tree = repo.find_commit(Oid::from_str(from)?)?.tree()?;
-        let to_tree = repo.find_commit(Oid::from_str(to)?)?.tree()?;
+        let mut opts = DiffOptions::new();
+        opts.minimal(true);
+        opts.ignore_whitespace_eol(true);
 
-        let diff = repo.diff_tree_to_tree(
-            Some(&from_tree),
-            Some(&to_tree),
-            Some(&mut DiffOptions::new().minimal(true).ignore_whitespace_eol(true)),
-        )?;
+        let diff = if let Some(to) = to {
+            let to_tree = repo.find_commit(Oid::from_str(to)?)?.tree()?;
+            repo.diff_tree_to_tree(Some(&from_tree), Some(&to_tree), Some(&mut opts))?
+        } else {
+            repo.diff_tree_to_workdir(Some(&from_tree), Some(&mut opts))?
+        };
 
         let mut file_events = vec![];
         let mut line_events = vec![];
@@ -101,9 +86,33 @@ impl VCS for Git {
             .for_each(|e| changes.process_line(e));
         Ok(changes)
     }
+}
 
-    fn diff_with_worktree(&self, _repo_path: AbsolutePath<'_>, _from: &str) -> Result<Changes> {
-        unimplemented!()
+impl VCS for Git {
+    fn lookup_file_bytes(
+        &self,
+        repo_path: AbsolutePath<'_>,
+        commit: &str,
+        file_path: &RelativePathBuf,
+    ) -> Result<Vec<u8>> {
+        let repo = Repository::open(repo_path.as_path())?;
+        let rev = format!("{}:{}", commit, file_path.as_git_path());
+        let obj = repo.revparse_single(&rev)?;
+        let blob = obj.as_blob().ok_or(Error::RevParse(rev))?;
+        Ok(blob.content().to_vec())
+    }
+
+    fn diff_with_version(
+        &self,
+        repo_path: AbsolutePath<'_>,
+        from: &str,
+        to: &str,
+    ) -> Result<Changes> {
+        self.diff(repo_path, from, Some(to))
+    }
+
+    fn diff_with_worktree(&self, repo_path: AbsolutePath<'_>, from: &str) -> Result<Changes> {
+        self.diff(repo_path, from, None)
     }
 }
 

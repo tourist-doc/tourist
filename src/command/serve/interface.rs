@@ -120,7 +120,7 @@ pub trait TouristRpc {
         &self,
         tour_id: TourId,
         title: String,
-        path: String,
+        path: PathBuf,
         line: usize,
     ) -> JsonResult<StopId>;
 

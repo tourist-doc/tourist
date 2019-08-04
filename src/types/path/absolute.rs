@@ -21,6 +21,10 @@ impl AbsolutePathBuf {
     pub fn try_relative(&self, _root: AbsolutePath<'_>) -> Option<RelativePathBuf> {
         unimplemented!();
     }
+
+    pub fn as_path_buf(&self) -> &PathBuf {
+        &self.0
+    }
 }
 
 #[derive(PartialEq, Eq)]
