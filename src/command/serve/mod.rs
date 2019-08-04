@@ -8,6 +8,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use uuid::Uuid;
 
+#[cfg(test)]
+mod tests;
+
 mod error;
 mod interface;
 mod io;
@@ -395,17 +398,24 @@ impl<M: TourFileManager> TouristRpc for Tourist<M> {
     }
 
     fn save_all(&self) -> JsonResult<()> {
-        unimplemented!();
+        for tour in self.get_tours().values() {
+            self.manager.save_tour(tour.id.clone()).as_json_result()?;
+        }
+        Ok(())
     }
 
-    fn save_tour(&self, tour_id: TourId, _path: Option<PathBuf>) -> JsonResult<()> {
-        // TODO: Set path if necessary
+    fn save_tour(&self, tour_id: TourId, path: Option<PathBuf>) -> JsonResult<()> {
+        if let Some(path) = path {
+            self.manager.set_tour_path(tour_id.clone(), path);
+        }
         self.manager.save_tour(tour_id).as_json_result()?;
-        unimplemented!();
+        Ok(())
     }
 
-    fn delete_tour(&self, _tour_id: TourId) -> JsonResult<()> {
-        unimplemented!();
+    fn delete_tour(&self, tour_id: TourId) -> JsonResult<()> {
+        self.forget_tour(tour_id.clone())?;
+        self.manager.delete_tour(tour_id).as_json_result()?;
+        Ok(())
     }
 }
 
@@ -431,68 +441,5 @@ impl Serve {
             .to_delegate(),
         );
         ServerBuilder::new(io).build();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::io::mock::MockTourFileManager;
-    use super::{Tourist, TouristRpc};
-    use crate::types::Tour;
-    use std::collections::{HashMap, HashSet};
-    use std::path::PathBuf;
-    use std::sync::{Arc, RwLock};
-
-    fn test_instance() -> (Tourist<MockTourFileManager>, MockTourFileManager) {
-        let manager = MockTourFileManager::new();
-        (
-            Tourist {
-                manager: manager.clone(),
-                tours: Arc::new(RwLock::new(HashMap::new())),
-                index: Arc::new(RwLock::new(HashMap::new())),
-                edits: Arc::new(RwLock::new(HashSet::new())),
-            },
-            manager,
-        )
-    }
-
-    #[test]
-    fn create_tour_test() {
-        let (tourist, _) = test_instance();
-        let id = tourist
-            .create_tour("My first tour".to_owned())
-            .expect("Call to create failed");
-        let tours = tourist.tours.read().expect("Lock was poisoned");
-        let tour = tours.get(&id).expect("Tour not found");
-        assert_eq!(tour.id, id);
-        assert_eq!(tour.title, "My first tour");
-    }
-
-    #[test]
-    fn open_tour_test() {
-        let tour_file = PathBuf::from("some/path");
-
-        let (tourist, manager) = test_instance();
-
-        manager.file_system.write().unwrap().insert(
-            tour_file.clone(),
-            Tour {
-                generator: 0,
-                id: "TOURID".to_owned(),
-                title: "My first tour".to_owned(),
-                description: "".to_owned(),
-                stops: vec![],
-                protocol_version: "1.0".to_owned(),
-                repositories: HashMap::new(),
-            },
-        );
-
-        tourist
-            .open_tour(tour_file, false)
-            .expect("Call to open failed");
-        let tours = tourist.tours.read().expect("Lock was poisoned");
-        let tour = tours.get("TOURID").expect("Tour not found");
-        assert_eq!(tour.title, "My first tour");
-        assert_eq!(tour.stops, vec![]);
     }
 }

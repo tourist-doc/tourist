@@ -9,12 +9,11 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-#[cfg(test)]
-pub mod mock;
-
 pub trait TourFileManager: Send + Sync + 'static {
     fn save_tour(&self, tour_id: TourId) -> Result<()>;
     fn load_tour(&self, path: PathBuf) -> Result<Tour>;
+    fn delete_tour(&self, tour_id: TourId) -> Result<()>;
+    fn set_tour_path(&self, tour_id: TourId, path: PathBuf);
 }
 
 pub struct AsyncTourFileManager {
@@ -31,7 +30,7 @@ impl AsyncTourFileManager {
     }
 
     pub fn start(&self) {
-        unimplemented!();
+        // TODO: Auto-save loop
     }
 }
 
@@ -57,5 +56,23 @@ impl TourFileManager for AsyncTourFileManager {
         let tour_source = fs::read_to_string(path).context(ErrorKind::FailedToReadTour)?;
         let tour = serialize::parse_tour(&tour_source).context(ErrorKind::FailedToParseTour)?;
         Ok(tour)
+    }
+
+    fn delete_tour(&self, tour_id: TourId) -> Result<()> {
+        let mut tours = self.tours.write().unwrap();
+        let mut paths = self.paths.write().unwrap();
+
+        if !tours.contains_key(&tour_id) {
+            return Err(ErrorKind::NoTourFound { id: tour_id }.into());
+        }
+
+        tours.remove(&tour_id);
+        paths.remove(&tour_id);
+        Ok(())
+    }
+
+    fn set_tour_path(&self, tour_id: TourId, path: PathBuf) {
+        let mut paths = self.paths.write().unwrap();
+        paths.insert(tour_id, path);
     }
 }
