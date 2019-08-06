@@ -21,7 +21,6 @@ impl Changes {
         Changes(HashMap::new())
     }
 
-    #[allow(dead_code)]
     pub fn for_file(&self, path: &RelativePathBuf) -> Option<&FileChanges> {
         self.0.get(path)
     }
@@ -123,8 +122,7 @@ impl FileChanges {
         }
     }
 
-    #[allow(dead_code)]
-    fn adjust_line(&self, line: usize) -> Option<usize> {
+    pub fn adjust_line(&self, line: usize) -> Option<usize> {
         let (changes, additions, deletions) = match self {
             FileChanges::Deleted => return None,
             FileChanges::Changed {

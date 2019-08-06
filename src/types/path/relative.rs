@@ -10,6 +10,10 @@ impl RelativePathBuf {
         RelativePathBuf(i.collect())
     }
 
+    pub fn components(&self) -> impl Iterator<Item = &Component> {
+        self.0.iter()
+    }
+
     pub fn as_path_buf(&self) -> PathBuf {
         let mut p = PathBuf::new();
         self.0.iter().for_each(|c| p.push(c));

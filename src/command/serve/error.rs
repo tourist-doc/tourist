@@ -38,6 +38,8 @@ pub enum ErrorKind {
         id
     )]
     NoPathForTour { id: String },
+    #[fail(display = "no version for repsoitory '{}'", repo)]
+    NoVersionForRepository { repo: String },
     #[fail(display = "the given path '{}' is not absolute", path)]
     ExpectedAbsolutePath { path: String },
     #[fail(
@@ -45,6 +47,11 @@ pub enum ErrorKind {
         path
     )]
     PathNotInIndex { path: String },
+    #[fail(
+        display = "the repsoitory '{}' does not appear to be mapped to a git repository",
+        repo
+    )]
+    RepositoryNotInIndex { repo: String },
     #[fail(display = "could not read the provided tour file")]
     FailedToReadTour,
     #[fail(display = "could not write the provided tour file")]
@@ -53,6 +60,8 @@ pub enum ErrorKind {
     FailedToParseTour,
     #[fail(display = "could not serialize the provided tour file")]
     FailedToSerializeTour,
+    #[fail(display = "failed to process a git diff")]
+    DiffFailed,
 }
 
 impl Fail for Error {

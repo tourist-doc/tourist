@@ -7,7 +7,9 @@ mod changes;
 pub use changes::Changes;
 use changes::{DiffFileEvent, DiffLineEvent};
 
-pub trait VCS {
+pub trait VCS: Send + Sync + 'static {
+    fn get_current_version(&self, repo_path: AbsolutePath<'_>) -> Result<String>;
+
     fn diff_with_version(
         &self,
         repo_path: AbsolutePath<'_>,
@@ -89,6 +91,12 @@ impl Git {
 }
 
 impl VCS for Git {
+    fn get_current_version(&self, repo_path: AbsolutePath<'_>) -> Result<String> {
+        let repo = Repository::open(repo_path.as_path())?;
+        let id = repo.head()?.peel_to_commit()?.id();
+        Ok(format!("{}", id))
+    }
+
     fn lookup_file_bytes(
         &self,
         repo_path: AbsolutePath<'_>,

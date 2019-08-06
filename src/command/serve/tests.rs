@@ -1,5 +1,8 @@
 use super::{Result, TourFileManager, TourId, Tourist, TouristRpc};
+use crate::error;
+use crate::types::path::{AbsolutePath, RelativePathBuf};
 use crate::types::Tour;
+use crate::vcs::{Changes, VCS};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -50,11 +53,47 @@ impl TourFileManager for MockTourFileManager {
     }
 }
 
-fn test_instance() -> (Tourist<MockTourFileManager>, MockTourFileManager) {
+#[derive(Clone)]
+struct MockVCS;
+
+impl VCS for MockVCS {
+    fn get_current_version(&self, _repo_path: AbsolutePath<'_>) -> error::Result<String> {
+        unimplemented!();
+    }
+
+    fn diff_with_version(
+        &self,
+        _repo_path: AbsolutePath<'_>,
+        _from: &str,
+        _to: &str,
+    ) -> error::Result<Changes> {
+        unimplemented!();
+    }
+
+    fn diff_with_worktree(
+        &self,
+        _repo_path: AbsolutePath<'_>,
+        _from: &str,
+    ) -> error::Result<Changes> {
+        unimplemented!();
+    }
+
+    fn lookup_file_bytes(
+        &self,
+        _repo_path: AbsolutePath<'_>,
+        _commit: &str,
+        _file_path: &RelativePathBuf,
+    ) -> error::Result<Vec<u8>> {
+        unimplemented!();
+    }
+}
+
+fn test_instance() -> (Tourist<MockTourFileManager, MockVCS>, MockTourFileManager) {
     let manager = MockTourFileManager::new();
     (
         Tourist {
             manager: manager.clone(),
+            vcs: MockVCS,
             tours: Arc::new(RwLock::new(HashMap::new())),
             index: Arc::new(RwLock::new(HashMap::new())),
             edits: Arc::new(RwLock::new(HashSet::new())),

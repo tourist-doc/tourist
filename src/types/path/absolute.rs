@@ -18,12 +18,42 @@ impl AbsolutePathBuf {
         AbsolutePath(&self.0)
     }
 
-    pub fn try_relative(&self, _root: AbsolutePath<'_>) -> Option<RelativePathBuf> {
-        unimplemented!();
+    pub fn try_relative(&self, root: AbsolutePath<'_>) -> Option<RelativePathBuf> {
+        let deep = self.as_absolute_path();
+        let mut deep_components = deep.components().peekable();
+        let mut root_components = root.components().peekable();
+
+        // Go through path, and keep going as long as components match
+        while let (Some(d), Some(r)) = (deep_components.peek(), root_components.peek()) {
+            // If components ever don't match, relativization fails
+            if d != r {
+                return None;
+            }
+            deep_components.next();
+            root_components.next();
+        }
+
+        if root_components.next().is_some() {
+            // If there are still root components left, that is also an error case
+            None
+        } else {
+            // Otherwise the remainder of the deep path is the relative path
+            Some(RelativePathBuf::from_components(
+                deep_components.map(|s| s.to_owned()),
+            ))
+        }
     }
 
     pub fn as_path_buf(&self) -> &PathBuf {
         &self.0
+    }
+
+    pub fn join_rel(&self, rel_path: &RelativePathBuf) -> AbsolutePathBuf {
+        let mut path = self.0.clone();
+        for comp in rel_path.components() {
+            path.push(comp);
+        }
+        AbsolutePathBuf(path)
     }
 }
 
@@ -34,11 +64,15 @@ impl<'a> AbsolutePath<'a> {
     pub fn as_path(&self) -> &Path {
         self.0
     }
+
+    fn components(&self) -> impl Iterator<Item = &str> {
+        self.0.components().map(|c| c.as_os_str().to_str().unwrap())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::AbsolutePathBuf;
+    use super::{AbsolutePathBuf, RelativePathBuf};
     use dirs;
     use std::path::Path;
 
@@ -48,5 +82,78 @@ mod tests {
         let not_abs = Path::new("some").join("path");
         assert!(AbsolutePathBuf::new(abs).is_some());
         assert!(AbsolutePathBuf::new(not_abs).is_none());
+    }
+
+    #[test]
+    fn simple_try_relative() {
+        // Relativize $HOME/some/path/and/more from $HOME/some/path, expect and/more
+        let root =
+            AbsolutePathBuf::new(dirs::home_dir().unwrap().join("some").join("path")).unwrap();
+        let path =
+            AbsolutePathBuf::new(root.as_path_buf().clone().join("and").join("more")).unwrap();
+        assert_eq!(
+            Some(RelativePathBuf::from_components(
+                vec!["and".to_owned(), "more".to_owned()].into_iter()
+            )),
+            path.try_relative(root.as_absolute_path()),
+        );
+    }
+
+    #[test]
+    fn unrelated_try_relative() {
+        // Relativize $DOWNLOADS/other/thing from $HOME/some/path, expect <none>
+        let root =
+            AbsolutePathBuf::new(dirs::home_dir().unwrap().join("some").join("path")).unwrap();
+        let path = AbsolutePathBuf::new(dirs::download_dir().unwrap().join("other").join("thing"))
+            .unwrap();
+        assert!(path.try_relative(root.as_absolute_path()).is_none());
+    }
+
+    #[test]
+    fn same_root_unrelated_try_relative() {
+        // Relativize $HOME/some/path/foo from $HOME/some/path/bar, expect <none>
+        let root = AbsolutePathBuf::new(
+            dirs::home_dir()
+                .unwrap()
+                .join("some")
+                .join("path")
+                .join("foo"),
+        )
+        .unwrap();
+        let path = AbsolutePathBuf::new(
+            dirs::home_dir()
+                .unwrap()
+                .join("some")
+                .join("path")
+                .join("bar"),
+        )
+        .unwrap();
+        assert!(path.try_relative(root.as_absolute_path()).is_none());
+    }
+
+    #[test]
+    fn empty_try_relative() {
+        // Relativize $HOME/some/path from $HOME/some/path, expect <empty>
+        let root =
+            AbsolutePathBuf::new(dirs::home_dir().unwrap().join("some").join("path")).unwrap();
+        let path = AbsolutePathBuf::new(root.as_path_buf().clone()).unwrap();
+        assert_eq!(
+            Some(RelativePathBuf::from_components(vec![].into_iter())),
+            path.try_relative(root.as_absolute_path()),
+        );
+    }
+
+    #[test]
+    fn file_try_relative() {
+        // Relativize $HOME/some/path/foo.txt from $HOME/some/path, expect foo.txt
+        let root =
+            AbsolutePathBuf::new(dirs::home_dir().unwrap().join("some").join("path")).unwrap();
+        let path = AbsolutePathBuf::new(root.as_path_buf().clone().join("foo.txt")).unwrap();
+        assert_eq!(
+            Some(RelativePathBuf::from_components(
+                vec!["foo.txt".to_owned()].into_iter()
+            )),
+            path.try_relative(root.as_absolute_path()),
+        );
     }
 }
