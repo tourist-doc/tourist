@@ -10,12 +10,11 @@ use zip;
 
 pub struct Package<V: VCS> {
     vcs: V,
-    index: Index,
 }
 
 impl<V: VCS> Package<V> {
-    pub fn new(vcs: V, index: Index) -> Self {
-        Package { vcs, index }
+    pub fn new(vcs: V) -> Self {
+        Package { vcs }
     }
 
     pub fn process(&self, zip_path: &Path, tour: Tour, tour_source: &str) -> Result<()> {
@@ -31,7 +30,7 @@ impl<V: VCS> Package<V> {
 
         for (repository, path) in files {
             let content = self.vcs.lookup_file_bytes(
-                self.index
+                Index
                     .get(&repository)
                     .ok_or_else(|| Error::NotInIndex(repository.clone()))?
                     .as_absolute_path(),

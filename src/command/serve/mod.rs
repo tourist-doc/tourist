@@ -42,12 +42,8 @@ impl TourMetadata {
     }
 }
 
-fn resolve_path(
-    index: &Index,
-    repository: &str,
-    rel_path: &RelativePathBuf,
-) -> Result<AbsolutePathBuf> {
-    let abs = index
+fn resolve_path(repository: &str, rel_path: &RelativePathBuf) -> Result<AbsolutePathBuf> {
+    let abs = Index
         .get(repository)
         .ok_or(ErrorKind::RepositoryNotInIndex {
             repo: repository.to_owned(),
@@ -55,15 +51,12 @@ fn resolve_path(
     Ok(abs.join_rel(rel_path))
 }
 
-fn find_path_in_context(
-    index: &Index,
-    path: PathBuf,
-) -> Result<(RelativePathBuf, String, AbsolutePathBuf)> {
+fn find_path_in_context(path: PathBuf) -> Result<(RelativePathBuf, String, AbsolutePathBuf)> {
     let deep =
         AbsolutePathBuf::new(path.clone()).ok_or_else(|| ErrorKind::ExpectedAbsolutePath {
             path: format!("{}", path.display()),
         })?;
-    for (repo_name, repo_path) in index.iter() {
+    for (repo_name, repo_path) in Index.all() {
         if let Some(rel) = deep.try_relative(repo_path.as_absolute_path()) {
             return Ok((rel, repo_name.to_owned(), repo_path.clone()));
         }
@@ -77,7 +70,6 @@ fn find_path_in_context(
 type Tracker = HashMap<TourId, Tour>;
 
 struct Tourist<M: TourFileManager, V: VCS> {
-    index: Arc<RwLock<Index>>,
     tours: Arc<RwLock<Tracker>>,
     edits: Arc<RwLock<HashSet<TourId>>>,
     manager: M,
@@ -163,18 +155,6 @@ impl<M: TourFileManager, V: VCS> Tourist<M, V> {
     /// `PoisonError`, we panic.
     fn get_edits_mut(&self) -> RwLockWriteGuard<HashSet<TourId>> {
         self.edits.write().unwrap()
-    }
-
-    /// Get a reference to the index of git repositories. In the event of a `PoisonError`, we
-    /// panic.
-    fn get_index(&self) -> RwLockReadGuard<Index> {
-        self.index.read().unwrap()
-    }
-
-    /// Get a mutable reference to the index of git repositories. In the event of a `PoisonError`,
-    /// we panic.
-    fn get_index_mut(&self) -> RwLockWriteGuard<Index> {
-        self.index.write().unwrap()
     }
 
     fn view_stop_reference(&self, sr: &StopReference) -> Result<StopReferenceView> {
@@ -285,7 +265,7 @@ impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
         self.with_tour_mut(&tour_id, |tour| {
             let mut new_versions = HashMap::new();
             for mut stop in tour.stops.iter_mut() {
-                let repo_path = resolve_path(&self.get_index(), &stop.repository, &stop.path)?;
+                let repo_path = resolve_path(&stop.repository, &stop.path)?;
                 let tour_version = tour.repositories.get(&stop.repository).ok_or(
                     ErrorKind::NoVersionForRepository {
                         repo: stop.repository.clone(),
@@ -307,6 +287,7 @@ impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
                 }
                 new_versions.insert(stop.repository.clone(), target_version.clone());
             }
+            tour.repositories.extend(new_versions);
             Ok(())
         })
         .as_json_result()
@@ -329,8 +310,7 @@ impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
         line: usize,
     ) -> JsonResult<StopId> {
         let id = format!("{}", Uuid::new_v4().to_simple());
-        let (rel_path, repo, repo_path) =
-            find_path_in_context(&self.get_index(), path).as_json_result()?;
+        let (rel_path, repo, repo_path) = find_path_in_context(path).as_json_result()?;
         let stop = Stop {
             id: id.clone(),
             title,
@@ -417,7 +397,7 @@ impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
                         repo: stop.repository.clone(),
                     },
                 )?;
-                let path = resolve_path(&self.get_index(), &stop.repository, &stop.path)?;
+                let path = resolve_path(&stop.repository, &stop.path)?;
                 let line = if naive {
                     Some(stop.line)
                 } else {
@@ -460,16 +440,15 @@ impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
     }
 
     fn index_repository(&self, repo_name: String, path: Option<PathBuf>) -> JsonResult<()> {
-        let mut index = self.get_index_mut();
         if let Some(path) = path {
             let abs_path = AbsolutePathBuf::new(path.clone())
                 .ok_or(ErrorKind::ExpectedAbsolutePath {
                     path: format!("{}", path.display()),
                 })
                 .as_json_result()?;
-            index.insert(repo_name, abs_path);
+            Index.set(&repo_name, &abs_path);
         } else {
-            index.remove(&repo_name);
+            Index.unset(&repo_name);
         }
         Ok(())
     }
@@ -514,7 +493,6 @@ impl Serve {
                 manager,
                 vcs: Git,
                 edits: Arc::new(RwLock::new(HashSet::new())),
-                index: Arc::new(RwLock::new(HashMap::new())),
             }
             .to_delegate(),
         );

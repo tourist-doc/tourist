@@ -1,6 +1,3 @@
-use dirs;
-use std::collections::HashMap;
-use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
@@ -16,46 +13,7 @@ use command::{Dump, Package, Serve};
 pub use command::{StopMetadata, StopReferenceView, StopView, TourMetadata, TourView, TouristRpc};
 use error::Result;
 use serialize::parse_tour;
-use types::path::AbsolutePathBuf;
-use types::Index;
 use vcs::Git;
-
-fn get_default_config() -> Option<PathBuf> {
-    dirs::home_dir().and_then(|mut path| {
-        path.push(".tourist");
-        if path.exists() {
-            Some(path)
-        } else {
-            None
-        }
-    })
-}
-
-fn get_override_config() -> Option<PathBuf> {
-    env::var("TOURIST_CONFIG").ok().and_then(|val| {
-        let path = PathBuf::from(val);
-        if path.exists() {
-            Some(path)
-        } else {
-            None
-        }
-    })
-}
-
-fn get_index() -> Result<Index> {
-    let path = get_override_config().or_else(get_default_config);
-    Ok(match path {
-        None => HashMap::new(),
-        Some(path) => {
-            let contents = &fs::read_to_string(path)?;
-            let index: HashMap<String, PathBuf> = serde_json::from_str(contents)?;
-            index
-                .iter()
-                .filter_map(|(k, v)| AbsolutePathBuf::new(v.clone()).map(|ap| (k.to_owned(), ap)))
-                .collect::<HashMap<_, _>>()
-        }
-    })
-}
 
 #[derive(StructOpt)]
 struct DumpArgs {
@@ -119,7 +77,6 @@ fn run(opts: TouristArgs) -> Result<()> {
             if args.context {
                 Dump::with_context(
                     Git,
-                    get_index()?,
                     args.around.or(args.above).unwrap_or(0),
                     args.around.or(args.below).unwrap_or(0),
                 )
@@ -131,7 +88,7 @@ fn run(opts: TouristArgs) -> Result<()> {
         TouristArgs::Package(args) => {
             let tour_source = fs::read_to_string(args.tour_file)?;
             let tour = parse_tour(&tour_source)?;
-            Package::new(Git, get_index()?).process(
+            Package::new(Git).process(
                 &args.out.unwrap_or_else(|| PathBuf::from("out.tour.pkg")),
                 tour,
                 &tour_source,

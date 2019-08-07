@@ -4,7 +4,7 @@ use super::{
 };
 use crate::error;
 use crate::types::path::{AbsolutePath, AbsolutePathBuf, RelativePathBuf};
-use crate::types::{Stop, Tour};
+use crate::types::{Index, Stop, Tour};
 use crate::vcs::{Changes, FileChanges, VCS};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -18,11 +18,11 @@ pub struct MockTourFileManager {
 }
 
 impl MockTourFileManager {
-    pub fn new() -> Self {
+    pub fn new(tour_map: Arc<RwLock<HashMap<TourId, Tour>>>) -> Self {
         MockTourFileManager {
             file_system: Arc::new(RwLock::new(HashMap::new())),
             path_map: Arc::new(RwLock::new(HashMap::new())),
-            tour_map: Arc::new(RwLock::new(HashMap::new())),
+            tour_map,
         }
     }
 }
@@ -46,7 +46,8 @@ impl TourFileManager for MockTourFileManager {
 
     fn delete_tour(&self, tour_id: TourId) -> Result<()> {
         self.tour_map.write().unwrap().remove(&tour_id);
-        self.path_map.write().unwrap().remove(&tour_id);
+        let path = self.path_map.write().unwrap().remove(&tour_id).unwrap();
+        self.file_system.write().unwrap().remove(&path);
         Ok(())
     }
 
@@ -94,13 +95,13 @@ impl VCS for MockVCS {
 }
 
 fn test_instance() -> (Tourist<MockTourFileManager, MockVCS>, MockTourFileManager) {
-    let manager = MockTourFileManager::new();
+    let tours = Arc::new(RwLock::new(HashMap::new()));
+    let manager = MockTourFileManager::new(Arc::clone(&tours));
     (
         Tourist {
+            tours,
             manager: manager.clone(),
             vcs: MockVCS { last_changes: None },
-            tours: Arc::new(RwLock::new(HashMap::new())),
-            index: Arc::new(RwLock::new(HashMap::new())),
             edits: Arc::new(RwLock::new(HashSet::new())),
         },
         manager,
@@ -312,9 +313,9 @@ fn forget_tour_test() {
 #[test]
 fn create_stop_test() {
     let (tourist, _) = test_instance();
-    tourist.get_index_mut().insert(
-        "my-repo".to_owned(),
-        AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
+    Index.set(
+        "my-repo",
+        &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
     );
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
@@ -505,9 +506,9 @@ fn link_stop_test() {
 #[test]
 fn locate_stop_test() {
     let (mut tourist, _) = test_instance();
-    tourist.get_index_mut().insert(
-        "my-repo".to_owned(),
-        AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
+    Index.set(
+        "my-repo",
+        &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
     );
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
@@ -587,4 +588,178 @@ fn remove_stop_test() {
     let tours = tourist.get_tours();
     let tour = tours.get("TOURID").unwrap();
     assert_eq!(tour.stops.len(), 0);
+}
+
+#[test]
+fn refresh_tour_test() {
+    let (mut tourist, _) = test_instance();
+    Index.set(
+        "my-repo",
+        &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
+    );
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![Stop {
+                id: "STOPID".to_owned(),
+                title: "A stop on the tour".to_owned(),
+                description: "".to_owned(),
+                path: RelativePathBuf::from("foo/bar.txt".to_owned()),
+                repository: "my-repo".to_owned(),
+                line: 100,
+                children: vec![],
+            }],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![("my-repo".to_owned(), "OLD_COMMIT".to_owned())]
+                .into_iter()
+                .collect(),
+        },
+    );
+
+    let mut changes = Changes::new();
+    changes.0.insert(
+        RelativePathBuf::from("foo/bar.txt".to_owned()),
+        FileChanges::Changed {
+            changes: vec![(100, 105)].into_iter().collect(),
+            deletions: vec![].into_iter().collect(),
+            additions: vec![].into_iter().collect(),
+        },
+    );
+    tourist.vcs.last_changes = Some(changes);
+
+    tourist
+        .refresh_tour("TOURID".to_owned(), Some("NEW_COMMIT".to_owned()))
+        .unwrap();
+
+    let tours = tourist.get_tours();
+    let tour = tours.get("TOURID").unwrap();
+    assert_eq!(tour.stops[0].line, 105);
+    assert_eq!(tour.repositories.get("my-repo").unwrap(), "NEW_COMMIT");
+}
+
+#[test]
+fn save_tour_test() {
+    let (tourist, manager) = test_instance();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![Stop {
+                id: "STOPID".to_owned(),
+                title: "A stop on the tour".to_owned(),
+                description: "".to_owned(),
+                path: RelativePathBuf::from("foo/bar.txt".to_owned()),
+                repository: "my-repo".to_owned(),
+                line: 100,
+                children: vec![],
+            }],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![("my-repo".to_owned(), "OLD_COMMIT".to_owned())]
+                .into_iter()
+                .collect(),
+        },
+    );
+
+    let path = PathBuf::from("/foo/bar");
+
+    tourist
+        .save_tour("TOURID".to_owned(), Some(path.clone()))
+        .unwrap();
+
+    let fs = manager.file_system.read().unwrap();
+    assert_eq!(fs.get(&path).unwrap().id, "TOURID");
+}
+
+#[test]
+fn save_all_test() {
+    let (tourist, manager) = test_instance();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![Stop {
+                id: "STOPID".to_owned(),
+                title: "A stop on the tour".to_owned(),
+                description: "".to_owned(),
+                path: RelativePathBuf::from("foo/bar.txt".to_owned()),
+                repository: "my-repo".to_owned(),
+                line: 100,
+                children: vec![],
+            }],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![("my-repo".to_owned(), "OLD_COMMIT".to_owned())]
+                .into_iter()
+                .collect(),
+        },
+    );
+
+    manager
+        .path_map
+        .write()
+        .unwrap()
+        .insert("TOURID".to_owned(), PathBuf::from("/foo/bar"));
+
+    tourist.save_all().unwrap();
+
+    let fs = manager.file_system.read().unwrap();
+    assert_eq!(fs.get(&PathBuf::from("/foo/bar")).unwrap().id, "TOURID");
+}
+
+#[test]
+fn delete_tour_test() {
+    let (tourist, manager) = test_instance();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![Stop {
+                id: "STOPID".to_owned(),
+                title: "A stop on the tour".to_owned(),
+                description: "".to_owned(),
+                path: RelativePathBuf::from("foo/bar.txt".to_owned()),
+                repository: "my-repo".to_owned(),
+                line: 100,
+                children: vec![],
+            }],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![("my-repo".to_owned(), "OLD_COMMIT".to_owned())]
+                .into_iter()
+                .collect(),
+        },
+    );
+
+    let path = PathBuf::from("/foo/bar");
+
+    tourist
+        .save_tour("TOURID".to_owned(), Some(path.clone()))
+        .unwrap();
+    tourist.delete_tour("TOURID".to_owned()).unwrap();
+
+    let fs = manager.file_system.read().unwrap();
+    assert!(fs.get(&path).is_none());
+}
+
+#[test]
+fn index_repository_test() {
+    let (tourist, _) = test_instance();
+    tourist
+        .index_repository("my-repo".to_owned(), Some(PathBuf::from("/foo/bar")))
+        .unwrap();
+    assert_eq!(
+        Index.get("my-repo").unwrap(),
+        AbsolutePathBuf::new(PathBuf::from("/foo/bar")).unwrap()
+    );
 }
