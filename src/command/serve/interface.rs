@@ -7,7 +7,7 @@ pub type TourId = String;
 pub type StopId = String;
 
 /// Metadata for a tour stop.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct StopMetadata {
     pub title: Option<String>,
@@ -15,7 +15,7 @@ pub struct StopMetadata {
 }
 
 /// A view of a tour stop reference.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum StopReferenceView {
     /// The linked tour is available in the tracker, so tour and stop titles can be provided.
@@ -36,7 +36,7 @@ pub enum StopReferenceView {
 }
 
 /// A view of a tour stop.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct StopView {
     pub title: String,
@@ -46,7 +46,7 @@ pub struct StopView {
 }
 
 /// Metadata for a tour.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TourMetadata {
     pub title: Option<String>,
@@ -54,7 +54,7 @@ pub struct TourMetadata {
 }
 
 /// A view of a tour.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TourView {
     pub title: String,

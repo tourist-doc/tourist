@@ -1,7 +1,7 @@
-use super::{Result, TourFileManager, TourId, Tourist, TouristRpc};
+use super::{Result, TourFileManager, TourId, TourMetadata, TourView, Tourist, TouristRpc};
 use crate::error;
-use crate::types::path::{AbsolutePath, RelativePathBuf};
-use crate::types::Tour;
+use crate::types::path::{AbsolutePath, AbsolutePathBuf, RelativePathBuf};
+use crate::types::{Stop, Tour};
 use crate::vcs::{Changes, VCS};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -58,7 +58,7 @@ struct MockVCS;
 
 impl VCS for MockVCS {
     fn get_current_version(&self, _repo_path: AbsolutePath<'_>) -> error::Result<String> {
-        unimplemented!();
+        Ok("COMMIT".to_owned())
     }
 
     fn diff_with_version(
@@ -103,6 +103,27 @@ fn test_instance() -> (Tourist<MockTourFileManager, MockVCS>, MockTourFileManage
 }
 
 #[test]
+fn list_tours_test() {
+    let (tourist, _) = test_instance();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![].into_iter().collect(),
+        },
+    );
+    assert_eq!(
+        tourist.list_tours().unwrap(),
+        vec![("TOURID".to_owned(), "My first tour".to_owned())]
+    );
+}
+
+#[test]
 fn create_tour_test() {
     let (tourist, _) = test_instance();
     let id = tourist
@@ -140,4 +161,183 @@ fn open_tour_test() {
     let tour = tours.get("TOURID").expect("Tour not found");
     assert_eq!(tour.title, "My first tour");
     assert_eq!(tour.stops, vec![]);
+}
+
+#[test]
+fn set_tour_edit_test() {
+    let (tourist, _) = test_instance();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![].into_iter().collect(),
+        },
+    );
+    tourist.set_tour_edit("TOURID".to_owned(), true).unwrap();
+    assert!(tourist.get_edits().contains("TOURID"));
+    tourist.set_tour_edit("TOURID".to_owned(), false).unwrap();
+    assert!(!tourist.get_edits().contains("TOURID"));
+}
+
+#[test]
+fn view_tour_test() {
+    let (tourist, _) = test_instance();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![Stop {
+                id: "STOPID".to_owned(),
+                title: "A stop on the tour".to_owned(),
+                description: "".to_owned(),
+                path: RelativePathBuf::from("foo/bar.txt".to_owned()),
+                repository: "my-repo".to_owned(),
+                line: 100,
+                children: vec![],
+            }],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![("my-repo".to_owned(), "COMMIT".to_owned())]
+                .into_iter()
+                .collect(),
+        },
+    );
+    let view = tourist.view_tour("TOURID".to_owned()).unwrap();
+    assert_eq!(
+        view,
+        TourView {
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![("STOPID".to_owned(), "A stop on the tour".to_owned())],
+            repositories: vec![("my-repo".to_owned(), "COMMIT".to_owned())],
+            edit: false,
+        }
+    );
+    tourist.get_edits_mut().insert("TOURID".to_owned());
+    assert!(tourist.view_tour("TOURID".to_owned()).unwrap().edit);
+}
+
+#[test]
+fn edit_tour_metadata_test() {
+    let (tourist, _) = test_instance();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![].into_iter().collect(),
+        },
+    );
+
+    tourist
+        .edit_tour_metadata(
+            "TOURID".to_owned(),
+            TourMetadata {
+                title: Some("New title".to_owned()),
+                description: None,
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        tourist.get_tours().get("TOURID").unwrap().title,
+        "New title"
+    );
+
+    tourist
+        .edit_tour_metadata(
+            "TOURID".to_owned(),
+            TourMetadata {
+                title: None,
+                description: Some("A description".to_owned()),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        tourist.get_tours().get("TOURID").unwrap().title,
+        "New title"
+    );
+    assert_eq!(
+        tourist.get_tours().get("TOURID").unwrap().description,
+        "A description"
+    );
+
+    tourist
+        .edit_tour_metadata(
+            "TOURID".to_owned(),
+            TourMetadata {
+                title: Some("X".to_owned()),
+                description: Some("X".to_owned()),
+            },
+        )
+        .unwrap();
+    assert_eq!(tourist.get_tours().get("TOURID").unwrap().title, "X");
+    assert_eq!(tourist.get_tours().get("TOURID").unwrap().description, "X");
+}
+
+#[test]
+fn forget_tour_test() {
+    let (tourist, _) = test_instance();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![].into_iter().collect(),
+        },
+    );
+    tourist.forget_tour("TOURID".to_owned()).unwrap();
+    assert!(tourist.get_tours().is_empty());
+}
+
+#[test]
+fn create_stop_test() {
+    let (tourist, _) = test_instance();
+    tourist.get_index_mut().insert(
+        "my-repo".to_owned(),
+        AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
+    );
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![].into_iter().collect(),
+        },
+    );
+    let id = tourist
+        .create_stop(
+            "TOURID".to_owned(),
+            "A tour stop".to_owned(),
+            PathBuf::from("/foo/bar/baz"),
+            100,
+        )
+        .unwrap();
+
+    let tours = tourist.get_tours();
+    let tour = tours.get("TOURID").unwrap();
+    assert_eq!(tour.stops[0].id, id);
+    assert_eq!(
+        tour.stops[0].path,
+        RelativePathBuf::from("bar/baz".to_owned())
+    );
+    assert_eq!(tour.repositories.get("my-repo").unwrap(), "COMMIT");
 }
