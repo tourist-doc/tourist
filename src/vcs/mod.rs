@@ -4,7 +4,7 @@ use git2::{DiffOptions, Oid, Repository};
 
 mod changes;
 
-pub use changes::Changes;
+pub use changes::{Changes, FileChanges};
 use changes::{DiffFileEvent, DiffLineEvent};
 
 pub trait VCS: Send + Sync + 'static {

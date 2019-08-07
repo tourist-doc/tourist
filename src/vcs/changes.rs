@@ -13,8 +13,8 @@ pub struct DiffLineEvent {
     pub to: Option<u32>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Changes(HashMap<RelativePathBuf, FileChanges>);
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Changes(pub HashMap<RelativePathBuf, FileChanges>);
 
 impl Changes {
     pub fn new() -> Self {
@@ -52,7 +52,7 @@ impl Changes {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FileChanges {
     Deleted,
     Renamed {
