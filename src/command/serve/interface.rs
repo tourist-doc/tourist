@@ -157,6 +157,16 @@ pub trait TouristRpc {
         other_stop_id: Option<StopId>,
     ) -> JsonResult<()>;
 
+    /// Unlink a tour stop from another tour or tour stop.
+    #[rpc(name = "link_stop")]
+    fn unlink_stop(
+        &self,
+        tour_id: TourId,
+        stop_id: StopId,
+        other_tour_id: TourId,
+        other_stop_id: Option<StopId>,
+    ) -> JsonResult<()>;
+
     /// Find the file location for a given stop. If `naive` is set, the location will be provided
     /// directly from the tour file, with no adjustment; otherwise the location will be adjusted
     /// based on a git diff.

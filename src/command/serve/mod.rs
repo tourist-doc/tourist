@@ -393,6 +393,21 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         .as_json_result()
     }
 
+    fn unlink_stop(
+        &self,
+        tour_id: TourId,
+        stop_id: StopId,
+        other_tour_id: TourId,
+        other_stop_id: Option<StopId>,
+    ) -> JsonResult<()> {
+        self.with_stop_mut(&tour_id, &stop_id, |stop| {
+            stop.children
+                .retain(|r| !(r.tour_id == other_tour_id && r.stop_id == other_stop_id));
+            Ok(())
+        })
+        .as_json_result()
+    }
+
     fn locate_stop(
         &self,
         tour_id: TourId,

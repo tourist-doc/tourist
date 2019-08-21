@@ -4,7 +4,7 @@ use super::{
 };
 use crate::error;
 use crate::types::path::{AbsolutePath, AbsolutePathBuf, RelativePathBuf};
-use crate::types::{Index, Stop, Tour};
+use crate::types::{Index, Stop, StopReference, Tour};
 use crate::vcs::{Changes, FileChanges, VCS};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -536,6 +536,68 @@ fn link_stop_test() {
             tour.stops[0].children[1].stop_id,
             Some("SECONDSTOPID".to_owned())
         );
+    }
+}
+
+#[test]
+fn unlink_stop_test() {
+    let (tourist, _, _) = test_instance();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![Stop {
+                id: "STOPID".to_owned(),
+                title: "A stop on the tour".to_owned(),
+                description: "".to_owned(),
+                path: RelativePathBuf::from("foo/bar.txt".to_owned()),
+                repository: "my-repo".to_owned(),
+                line: 100,
+                children: vec![
+                    StopReference {
+                        tour_id: "OTHERID".to_owned(),
+                        stop_id: None,
+                    },
+                    StopReference {
+                        tour_id: "SECONDID".to_owned(),
+                        stop_id: Some("SECONDSTOPID".to_owned()),
+                    },
+                ],
+            }],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![("my-repo".to_owned(), "COMMIT".to_owned())]
+                .into_iter()
+                .collect(),
+        },
+    );
+    {
+        tourist
+            .unlink_stop(
+                "TOURID".to_owned(),
+                "STOPID".to_owned(),
+                "OTHERID".to_owned(),
+                None,
+            )
+            .unwrap();
+        let tours = tourist.get_tours();
+        let tour = tours.get("TOURID").unwrap();
+        assert_eq!(tour.stops[0].children.len(), 1);
+    }
+    {
+        tourist
+            .unlink_stop(
+                "TOURID".to_owned(),
+                "STOPID".to_owned(),
+                "SECONDID".to_owned(),
+                Some("SECONDSTOPID".to_owned()),
+            )
+            .unwrap();
+        let tours = tourist.get_tours();
+        let tour = tours.get("TOURID").unwrap();
+        assert_eq!(tour.stops[0].children.len(), 0);
     }
 }
 
