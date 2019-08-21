@@ -36,36 +36,44 @@ pub struct Tour {
     pub generator: usize,
 }
 
-// TODO: Break into trait, mock
+#[derive(Clone)]
+pub struct FileIndex;
 
-pub struct Index;
+pub trait Index: Send + Sync + 'static + Clone {
+    fn get(&self, repo_name: &str) -> Option<AbsolutePathBuf>;
+    fn set(&self, repo_name: &str, path: &AbsolutePathBuf);
+    fn unset(&self, repo_name: &str);
+    fn all(&self) -> Vec<(String, AbsolutePathBuf)>;
+}
 
-impl Index {
+impl FileIndex {
     fn config_path(&self) -> PathBuf {
         dirs::home_dir().unwrap().join(".tourist")
     }
+}
 
-    pub fn get(&self, repo_name: &str) -> Option<AbsolutePathBuf> {
+impl Index for FileIndex {
+    fn get(&self, repo_name: &str) -> Option<AbsolutePathBuf> {
         let index: HashMap<String, AbsolutePathBuf> =
             serde_json::from_str(&fs::read_to_string(self.config_path()).unwrap()).unwrap();
         index.get(repo_name).cloned()
     }
 
-    pub fn set(&self, repo_name: &str, path: &AbsolutePathBuf) {
+    fn set(&self, repo_name: &str, path: &AbsolutePathBuf) {
         let mut index: HashMap<String, AbsolutePathBuf> =
             serde_json::from_str(&fs::read_to_string(self.config_path()).unwrap()).unwrap();
         index.insert(repo_name.to_owned(), path.clone());
         fs::write(self.config_path(), serde_json::to_string(&index).unwrap()).unwrap();
     }
 
-    pub fn unset(&self, repo_name: &str) {
+    fn unset(&self, repo_name: &str) {
         let mut index: HashMap<String, AbsolutePathBuf> =
             serde_json::from_str(&fs::read_to_string(self.config_path()).unwrap()).unwrap();
         index.remove(repo_name);
         fs::write(self.config_path(), serde_json::to_string(&index).unwrap()).unwrap();
     }
 
-    pub fn all(&self) -> Vec<(String, AbsolutePathBuf)> {
+    fn all(&self) -> Vec<(String, AbsolutePathBuf)> {
         let index: HashMap<String, AbsolutePathBuf> =
             serde_json::from_str(&fs::read_to_string(self.config_path()).unwrap()).unwrap();
         index.into_iter().collect()

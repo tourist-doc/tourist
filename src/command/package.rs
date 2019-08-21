@@ -8,13 +8,14 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use zip;
 
-pub struct Package<V: VCS> {
+pub struct Package<V: VCS, I: Index> {
     vcs: V,
+    index: I,
 }
 
-impl<V: VCS> Package<V> {
-    pub fn new(vcs: V) -> Self {
-        Package { vcs }
+impl<V: VCS, I: Index> Package<V, I> {
+    pub fn new(vcs: V, index: I) -> Self {
+        Package { vcs, index }
     }
 
     pub fn process(&self, zip_path: &Path, tour: Tour, tour_source: &str) -> Result<()> {
@@ -30,7 +31,7 @@ impl<V: VCS> Package<V> {
 
         for (repository, path) in files {
             let content = self.vcs.lookup_file_bytes(
-                Index
+                self.index
                     .get(&repository)
                     .ok_or_else(|| Error::NotInIndex(repository.clone()))?
                     .as_absolute_path(),

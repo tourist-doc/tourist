@@ -1,6 +1,6 @@
 use crate::types::path::{AbsolutePathBuf, RelativePathBuf};
 use crate::types::{Index, Stop, StopReference, Tour};
-use crate::vcs::{Git, VCS};
+use crate::vcs::VCS;
 use failure::ResultExt;
 use jsonrpc_core;
 use jsonrpc_core::Result as JsonResult;
@@ -42,8 +42,12 @@ impl TourMetadata {
     }
 }
 
-fn resolve_path(repository: &str, rel_path: &RelativePathBuf) -> Result<AbsolutePathBuf> {
-    let abs = Index
+fn resolve_path<I: Index>(
+    index: &I,
+    repository: &str,
+    rel_path: &RelativePathBuf,
+) -> Result<AbsolutePathBuf> {
+    let abs = index
         .get(repository)
         .ok_or(ErrorKind::RepositoryNotInIndex {
             repo: repository.to_owned(),
@@ -51,12 +55,15 @@ fn resolve_path(repository: &str, rel_path: &RelativePathBuf) -> Result<Absolute
     Ok(abs.join_rel(rel_path))
 }
 
-fn find_path_in_context(path: PathBuf) -> Result<(RelativePathBuf, String, AbsolutePathBuf)> {
+fn find_path_in_context<I: Index>(
+    index: &I,
+    path: PathBuf,
+) -> Result<(RelativePathBuf, String, AbsolutePathBuf)> {
     let deep =
         AbsolutePathBuf::new(path.clone()).ok_or_else(|| ErrorKind::ExpectedAbsolutePath {
             path: format!("{}", path.display()),
         })?;
-    for (repo_name, repo_path) in Index.all() {
+    for (repo_name, repo_path) in index.all() {
         if let Some(rel) = deep.try_relative(repo_path.as_absolute_path()) {
             return Ok((rel, repo_name.to_owned(), repo_path.clone()));
         }
@@ -69,14 +76,15 @@ fn find_path_in_context(path: PathBuf) -> Result<(RelativePathBuf, String, Absol
 
 type Tracker = HashMap<TourId, Tour>;
 
-struct Tourist<M: TourFileManager, V: VCS> {
+struct Tourist<M: TourFileManager, V: VCS, I: Index> {
     tours: Arc<RwLock<Tracker>>,
     edits: Arc<RwLock<HashSet<TourId>>>,
     manager: M,
     vcs: V,
+    index: I,
 }
 
-impl<M: TourFileManager, V: VCS> Tourist<M, V> {
+impl<M: TourFileManager, V: VCS, I: Index> Tourist<M, V, I> {
     /// Get a reference to the currently managed map of tours. In the event of a `PoisonError`, we
     /// panic.
     fn get_tours(&self) -> RwLockReadGuard<HashMap<TourId, Tour>> {
@@ -189,7 +197,7 @@ impl<M: TourFileManager, V: VCS> Tourist<M, V> {
     }
 }
 
-impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
+impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     fn list_tours(&self) -> JsonResult<Vec<(TourId, String)>> {
         let tours = self.get_tours();
         Ok(tours
@@ -265,7 +273,7 @@ impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
         self.with_tour_mut(&tour_id, |tour| {
             let mut new_versions = HashMap::new();
             for mut stop in tour.stops.iter_mut() {
-                let repo_path = resolve_path(&stop.repository, &stop.path)?;
+                let repo_path = resolve_path(&self.index, &stop.repository, &stop.path)?;
                 let tour_version = tour.repositories.get(&stop.repository).ok_or(
                     ErrorKind::NoVersionForRepository {
                         repo: stop.repository.clone(),
@@ -310,7 +318,8 @@ impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
         line: usize,
     ) -> JsonResult<StopId> {
         let id = format!("{}", Uuid::new_v4().to_simple());
-        let (rel_path, repo, repo_path) = find_path_in_context(path).as_json_result()?;
+        let (rel_path, repo, repo_path) =
+            find_path_in_context(&self.index, path).as_json_result()?;
         let stop = Stop {
             id: id.clone(),
             title,
@@ -397,7 +406,7 @@ impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
                         repo: stop.repository.clone(),
                     },
                 )?;
-                let path = resolve_path(&stop.repository, &stop.path)?;
+                let path = resolve_path(&self.index, &stop.repository, &stop.path)?;
                 let line = if naive {
                     Some(stop.line)
                 } else {
@@ -446,9 +455,9 @@ impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
                     path: format!("{}", path.display()),
                 })
                 .as_json_result()?;
-            Index.set(&repo_name, &abs_path);
+            self.index.set(&repo_name, &abs_path);
         } else {
-            Index.unset(&repo_name);
+            self.index.unset(&repo_name);
         }
         Ok(())
     }
@@ -475,11 +484,14 @@ impl<M: TourFileManager, V: VCS> TouristRpc for Tourist<M, V> {
     }
 }
 
-pub struct Serve;
+pub struct Serve<V: VCS, I: Index> {
+    vcs: V,
+    index: I,
+}
 
-impl Serve {
-    pub fn new() -> Self {
-        Serve
+impl<V: VCS, I: Index> Serve<V, I> {
+    pub fn new(vcs: V, index: I) -> Self {
+        Serve { vcs, index }
     }
 
     pub fn process(&self) {
@@ -491,7 +503,8 @@ impl Serve {
             Tourist {
                 tours,
                 manager,
-                vcs: Git,
+                vcs: self.vcs.clone(),
+                index: self.index.clone(),
                 edits: Arc::new(RwLock::new(HashSet::new())),
             }
             .to_delegate(),

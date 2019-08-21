@@ -2,8 +2,13 @@ use crate::error::{Error, Result};
 use crate::types::{Index, Stop, Tour};
 use crate::vcs::VCS;
 
-pub enum Dump<V: VCS> {
-    Context { vcs: V, above: usize, below: usize },
+pub enum Dump<V: VCS, I: Index> {
+    Context {
+        vcs: V,
+        index: I,
+        above: usize,
+        below: usize,
+    },
     NoContext,
 }
 
@@ -25,19 +30,29 @@ fn code_range(code: String, target: usize, above: usize, below: usize) -> String
         .join("\n")
 }
 
-impl<V: VCS> Dump<V> {
+impl<V: VCS, I: Index> Dump<V, I> {
     pub fn new() -> Self {
         Dump::NoContext
     }
 
-    pub fn with_context(vcs: V, above: usize, below: usize) -> Self {
-        Dump::Context { vcs, above, below }
+    pub fn with_context(vcs: V, index: I, above: usize, below: usize) -> Self {
+        Dump::Context {
+            vcs,
+            index,
+            above,
+            below,
+        }
     }
 
     fn extract_context(&self, stop: &Stop, commit: &str) -> Result<String> {
         match self {
-            Dump::Context { vcs, above, below } => {
-                let repo_path = Index
+            Dump::Context {
+                vcs,
+                index,
+                above,
+                below,
+            } => {
+                let repo_path = index
                     .get(&stop.repository)
                     .ok_or_else(|| Error::NotInIndex(stop.repository.clone()))?;
 

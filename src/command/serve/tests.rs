@@ -94,23 +94,59 @@ impl VCS for MockVCS {
     }
 }
 
-fn test_instance() -> (Tourist<MockTourFileManager, MockVCS>, MockTourFileManager) {
+#[derive(Clone)]
+struct MockIndex(pub Arc<RwLock<HashMap<String, AbsolutePathBuf>>>);
+
+impl Index for MockIndex {
+    fn get(&self, repo_name: &str) -> Option<AbsolutePathBuf> {
+        self.0.read().unwrap().get(repo_name).cloned()
+    }
+
+    fn set(&self, repo_name: &str, path: &AbsolutePathBuf) {
+        self.0
+            .write()
+            .unwrap()
+            .insert(repo_name.to_owned(), path.clone());
+    }
+
+    fn unset(&self, repo_name: &str) {
+        self.0.write().unwrap().remove(repo_name);
+    }
+
+    fn all(&self) -> Vec<(String, AbsolutePathBuf)> {
+        self.0
+            .read()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| (k.to_owned(), v.clone()))
+            .collect()
+    }
+}
+
+fn test_instance() -> (
+    Tourist<MockTourFileManager, MockVCS, MockIndex>,
+    MockTourFileManager,
+    MockIndex,
+) {
     let tours = Arc::new(RwLock::new(HashMap::new()));
     let manager = MockTourFileManager::new(Arc::clone(&tours));
+    let index = MockIndex(Arc::new(RwLock::new(HashMap::new())));
     (
         Tourist {
             tours,
             manager: manager.clone(),
             vcs: MockVCS { last_changes: None },
+            index: index.clone(),
             edits: Arc::new(RwLock::new(HashSet::new())),
         },
         manager,
+        index,
     )
 }
 
 #[test]
 fn list_tours_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -131,7 +167,7 @@ fn list_tours_test() {
 
 #[test]
 fn create_tour_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, _) = test_instance();
     let id = tourist
         .create_tour("My first tour".to_owned())
         .expect("Call to create failed");
@@ -145,7 +181,7 @@ fn create_tour_test() {
 fn open_tour_test() {
     let tour_file = PathBuf::from("some/path");
 
-    let (tourist, manager) = test_instance();
+    let (tourist, manager, _) = test_instance();
 
     manager.file_system.write().unwrap().insert(
         tour_file.clone(),
@@ -171,7 +207,7 @@ fn open_tour_test() {
 
 #[test]
 fn set_tour_edit_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -192,7 +228,7 @@ fn set_tour_edit_test() {
 
 #[test]
 fn view_tour_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -232,7 +268,7 @@ fn view_tour_test() {
 
 #[test]
 fn edit_tour_metadata_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -293,7 +329,7 @@ fn edit_tour_metadata_test() {
 
 #[test]
 fn forget_tour_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -312,8 +348,8 @@ fn forget_tour_test() {
 
 #[test]
 fn create_stop_test() {
-    let (tourist, _) = test_instance();
-    Index.set(
+    let (tourist, _, index) = test_instance();
+    index.set(
         "my-repo",
         &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
     );
@@ -350,7 +386,7 @@ fn create_stop_test() {
 
 #[test]
 fn view_stop_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -389,7 +425,7 @@ fn view_stop_test() {
 
 #[test]
 fn edit_stop_metadata_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -447,7 +483,7 @@ fn edit_stop_metadata_test() {
 
 #[test]
 fn link_stop_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -505,8 +541,8 @@ fn link_stop_test() {
 
 #[test]
 fn locate_stop_test() {
-    let (mut tourist, _) = test_instance();
-    Index.set(
+    let (mut tourist, _, index) = test_instance();
+    index.set(
         "my-repo",
         &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
     );
@@ -559,7 +595,7 @@ fn locate_stop_test() {
 
 #[test]
 fn remove_stop_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -592,8 +628,8 @@ fn remove_stop_test() {
 
 #[test]
 fn refresh_tour_test() {
-    let (mut tourist, _) = test_instance();
-    Index.set(
+    let (mut tourist, _, index) = test_instance();
+    index.set(
         "my-repo",
         &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
     );
@@ -643,7 +679,7 @@ fn refresh_tour_test() {
 
 #[test]
 fn save_tour_test() {
-    let (tourist, manager) = test_instance();
+    let (tourist, manager, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -679,7 +715,7 @@ fn save_tour_test() {
 
 #[test]
 fn save_all_test() {
-    let (tourist, manager) = test_instance();
+    let (tourist, manager, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -717,7 +753,7 @@ fn save_all_test() {
 
 #[test]
 fn delete_tour_test() {
-    let (tourist, manager) = test_instance();
+    let (tourist, manager, _) = test_instance();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
         Tour {
@@ -754,12 +790,12 @@ fn delete_tour_test() {
 
 #[test]
 fn index_repository_test() {
-    let (tourist, _) = test_instance();
+    let (tourist, _, index) = test_instance();
     tourist
         .index_repository("my-repo".to_owned(), Some(PathBuf::from("/foo/bar")))
         .unwrap();
     assert_eq!(
-        Index.get("my-repo").unwrap(),
+        index.get("my-repo").unwrap(),
         AbsolutePathBuf::new(PathBuf::from("/foo/bar")).unwrap()
     );
 }

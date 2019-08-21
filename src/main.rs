@@ -13,6 +13,7 @@ use command::{Dump, Package, Serve};
 pub use command::{StopMetadata, StopReferenceView, StopView, TourMetadata, TourView, TouristRpc};
 use error::Result;
 use serialize::parse_tour;
+use types::FileIndex;
 use vcs::Git;
 
 #[derive(StructOpt)]
@@ -77,6 +78,7 @@ fn run(opts: TouristArgs) -> Result<()> {
             if args.context {
                 Dump::with_context(
                     Git,
+                    FileIndex,
                     args.around.or(args.above).unwrap_or(0),
                     args.around.or(args.below).unwrap_or(0),
                 )
@@ -88,14 +90,14 @@ fn run(opts: TouristArgs) -> Result<()> {
         TouristArgs::Package(args) => {
             let tour_source = fs::read_to_string(args.tour_file)?;
             let tour = parse_tour(&tour_source)?;
-            Package::new(Git).process(
+            Package::new(Git, FileIndex).process(
                 &args.out.unwrap_or_else(|| PathBuf::from("out.tour.pkg")),
                 tour,
                 &tour_source,
             )?;
         }
         TouristArgs::Serve(_) => {
-            Serve::new().process();
+            Serve::new(Git, FileIndex).process();
         }
     }
 
