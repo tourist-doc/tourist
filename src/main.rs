@@ -6,6 +6,7 @@ use structopt::StructOpt;
 
 mod command;
 mod error;
+mod index;
 mod serialize;
 mod types;
 mod vcs;
@@ -13,8 +14,8 @@ mod vcs;
 use command::{Dump, Package, Serve};
 pub use command::{StopMetadata, StopReferenceView, StopView, TourMetadata, TourView, TouristRpc};
 use error::{ErrorKind, Result};
+use index::FileIndex;
 use serialize::parse_tour;
-use types::FileIndex;
 use vcs::Git;
 
 #[derive(StructOpt)]

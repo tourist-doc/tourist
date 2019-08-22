@@ -1,5 +1,6 @@
 use crate::error::{ErrorKind, Result};
-use crate::types::{Index, Tour};
+use crate::index::Index;
+use crate::types::Tour;
 use crate::vcs::VCS;
 use failure::ResultExt;
 use std::collections::HashSet;

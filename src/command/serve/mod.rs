@@ -1,6 +1,7 @@
 use crate::error::{AsJsonResult, ErrorKind, Result};
+use crate::index::Index;
 use crate::types::path::{AbsolutePathBuf, RelativePathBuf};
-use crate::types::{Index, Stop, StopReference, Tour};
+use crate::types::{Stop, StopReference, Tour};
 use crate::vcs::VCS;
 use failure::ResultExt;
 use jsonrpc_core;

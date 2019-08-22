@@ -3,8 +3,9 @@ use super::{
     TouristRpc,
 };
 use crate::error;
+use crate::index::Index;
 use crate::types::path::{AbsolutePath, AbsolutePathBuf, RelativePathBuf};
-use crate::types::{Index, Stop, StopReference, Tour};
+use crate::types::{Stop, StopReference, Tour};
 use crate::vcs::{Changes, FileChanges, VCS};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;

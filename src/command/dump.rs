@@ -1,5 +1,6 @@
 use crate::error::{ErrorKind, Result};
-use crate::types::{Index, Stop, Tour};
+use crate::index::Index;
+use crate::types::{Stop, Tour};
 use crate::vcs::VCS;
 
 pub enum Dump<V: VCS, I: Index> {
