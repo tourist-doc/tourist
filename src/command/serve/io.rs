@@ -46,9 +46,9 @@ impl TourFileManager for AsyncTourFileManager {
             fs::write(path, tour_source).context(ErrorKind::FailedToWriteTour)?;
             Ok(())
         } else if tour.is_none() {
-            Err(ErrorKind::NoTourFound { id: tour_id }.into())
+            Err(ErrorKind::NoTourFound.attach("ID", tour_id))
         } else {
-            Err(ErrorKind::NoPathForTour { id: tour_id }.into())
+            Err(ErrorKind::NoPathForTour.attach("ID", tour_id))
         }
     }
 
@@ -63,7 +63,7 @@ impl TourFileManager for AsyncTourFileManager {
         let mut paths = self.paths.write().unwrap();
 
         if !tours.contains_key(&tour_id) {
-            return Err(ErrorKind::NoTourFound { id: tour_id }.into());
+            return Err(ErrorKind::NoTourFound.attach("ID", tour_id));
         }
 
         tours.remove(&tour_id);

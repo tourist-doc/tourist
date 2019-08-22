@@ -49,9 +49,7 @@ fn resolve_path<I: Index>(
 ) -> Result<AbsolutePathBuf> {
     let abs = index
         .get(repository)
-        .ok_or(ErrorKind::RepositoryNotInIndex {
-            repo: repository.to_owned(),
-        })?;
+        .ok_or_else(|| ErrorKind::RepositoryNotInIndex.attach("Repository", repository))?;
     Ok(abs.join_rel(rel_path))
 }
 
@@ -59,19 +57,14 @@ fn find_path_in_context<I: Index>(
     index: &I,
     path: PathBuf,
 ) -> Result<(RelativePathBuf, String, AbsolutePathBuf)> {
-    let deep =
-        AbsolutePathBuf::new(path.clone()).ok_or_else(|| ErrorKind::ExpectedAbsolutePath {
-            path: format!("{}", path.display()),
-        })?;
+    let deep = AbsolutePathBuf::new(path.clone())
+        .ok_or_else(|| ErrorKind::ExpectedAbsolutePath.attach("Path", path.display()))?;
     for (repo_name, repo_path) in index.all() {
         if let Some(rel) = deep.try_relative(repo_path.as_absolute_path()) {
             return Ok((rel, repo_name.to_owned(), repo_path.clone()));
         }
     }
-    Err(ErrorKind::PathNotInIndex {
-        path: format!("{}", path.display()),
-    }
-    .into())
+    Err(ErrorKind::PathNotInIndex.attach("Path", path.display()))
 }
 
 type Tracker = HashMap<TourId, Tour>;
@@ -102,9 +95,9 @@ impl<M: TourFileManager, V: VCS, I: Index> Tourist<M, V, I> {
         F: FnOnce(&Tour) -> Result<T>,
     {
         let tours = self.get_tours();
-        let tour = tours.get(tour_id).ok_or(ErrorKind::NoTourFound {
-            id: tour_id.to_owned(),
-        })?;
+        let tour = tours
+            .get(tour_id)
+            .ok_or_else(|| ErrorKind::NoTourFound.attach("ID", tour_id))?;
         f(tour)
     }
 
@@ -113,9 +106,9 @@ impl<M: TourFileManager, V: VCS, I: Index> Tourist<M, V, I> {
         F: FnOnce(&mut Tour) -> Result<T>,
     {
         let mut tours = self.get_tours_mut();
-        let tour = tours.get_mut(tour_id).ok_or(ErrorKind::NoTourFound {
-            id: tour_id.to_owned(),
-        })?;
+        let tour = tours
+            .get_mut(tour_id)
+            .ok_or_else(|| ErrorKind::NoTourFound.attach("ID", tour_id))?;
         f(tour)
     }
 
@@ -124,14 +117,15 @@ impl<M: TourFileManager, V: VCS, I: Index> Tourist<M, V, I> {
         F: FnOnce(&Stop) -> Result<T>,
     {
         self.with_tour(tour_id, |tour| {
-            let stop =
-                tour.stops
-                    .iter()
-                    .find(|s| s.id == *stop_id)
-                    .ok_or(ErrorKind::NoStopFound {
-                        tour_id: tour_id.to_owned(),
-                        stop_id: stop_id.to_owned(),
-                    })?;
+            let stop = tour
+                .stops
+                .iter()
+                .find(|s| s.id == *stop_id)
+                .ok_or_else(|| {
+                    ErrorKind::NoStopFound
+                        .attach("Tour ID", tour_id)
+                        .attach("Stop ID", stop_id)
+                })?;
             f(stop)
         })
     }
@@ -141,14 +135,15 @@ impl<M: TourFileManager, V: VCS, I: Index> Tourist<M, V, I> {
         F: FnOnce(&mut Stop) -> Result<T>,
     {
         self.with_tour_mut(tour_id, |tour| {
-            let stop =
-                tour.stops
-                    .iter_mut()
-                    .find(|s| s.id == *stop_id)
-                    .ok_or(ErrorKind::NoStopFound {
-                        tour_id: tour_id.to_owned(),
-                        stop_id: stop_id.to_owned(),
-                    })?;
+            let stop = tour
+                .stops
+                .iter_mut()
+                .find(|s| s.id == *stop_id)
+                .ok_or_else(|| {
+                    ErrorKind::NoStopFound
+                        .attach("Tour ID", tour_id)
+                        .attach("Stop ID", stop_id)
+                })?;
             f(stop)
         })
     }
@@ -174,9 +169,10 @@ impl<M: TourFileManager, V: VCS, I: Index> Tourist<M, V, I> {
                     .stops
                     .iter()
                     .find(|s| s.id == *other_stop_id)
-                    .ok_or(ErrorKind::NoStopFound {
-                        tour_id: sr.tour_id.clone(),
-                        stop_id: other_stop_id.clone(),
+                    .ok_or_else(|| {
+                        ErrorKind::NoStopFound
+                            .attach("Tour ID", sr.tour_id.clone())
+                            .attach("Stop ID", other_stop_id)
                     })?;
                 (Some(other_stop_id.clone()), Some(other_stop.title.clone()))
             } else {
@@ -274,11 +270,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
             let mut new_versions = HashMap::new();
             for mut stop in tour.stops.iter_mut() {
                 let repo_path = resolve_path(&self.index, &stop.repository, &stop.path)?;
-                let tour_version = tour.repositories.get(&stop.repository).ok_or(
-                    ErrorKind::NoVersionForRepository {
-                        repo: stop.repository.clone(),
-                    },
-                )?;
+                let tour_version = tour.repositories.get(&stop.repository).ok_or_else(|| {
+                    ErrorKind::NoVersionForRepository.attach("Repository", stop.repository.clone())
+                })?;
                 let target_version = if let Some(commit) = commit.clone() {
                     commit
                 } else {
@@ -304,7 +298,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     fn forget_tour(&self, tour_id: TourId) -> JsonResult<()> {
         let mut tours = self.get_tours_mut();
         if !tours.contains_key(&tour_id) {
-            return Err(ErrorKind::NoTourFound { id: tour_id }).as_json_result();
+            return Err(ErrorKind::NoTourFound.attach("ID", tour_id)).as_json_result();
         }
         tours.remove(&tour_id);
         Ok(())
@@ -332,9 +326,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         let mut tours = self.get_tours_mut();
         let tour = tours
             .get_mut(&tour_id)
-            .ok_or(ErrorKind::NoTourFound {
-                id: tour_id.clone(),
-            })
+            .ok_or_else(|| ErrorKind::NoTourFound.attach("ID", tour_id))
             .as_json_result()?;
         tour.stops.push(stop);
         tour.repositories.insert(
@@ -416,11 +408,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     ) -> JsonResult<Option<(PathBuf, usize)>> {
         self.with_tour(&tour_id, |tour| {
             self.with_stop(&tour_id, &stop_id, |stop| {
-                let version = tour.repositories.get(&stop.repository).ok_or(
-                    ErrorKind::NoVersionForRepository {
-                        repo: stop.repository.clone(),
-                    },
-                )?;
+                let version = tour.repositories.get(&stop.repository).ok_or_else(|| {
+                    ErrorKind::NoVersionForRepository.attach("Repository", stop.repository.clone())
+                })?;
                 let path = resolve_path(&self.index, &stop.repository, &stop.path)?;
                 let line = if naive {
                     Some(stop.line)
@@ -451,11 +441,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
             tour.stops.retain(|stop| stop.id != stop_id);
             if n == tour.stops.len() {
                 // No change in length means that the stop was not deleted successfully
-                Err(ErrorKind::NoStopFound {
-                    tour_id: tour_id.clone(),
-                    stop_id,
-                }
-                .into())
+                Err(ErrorKind::NoStopFound
+                    .attach("Tour ID", tour_id.clone())
+                    .attach("Stop ID", stop_id.clone()))
             } else {
                 Ok(())
             }
@@ -466,9 +454,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     fn index_repository(&self, repo_name: String, path: Option<PathBuf>) -> JsonResult<()> {
         if let Some(path) = path {
             let abs_path = AbsolutePathBuf::new(path.clone())
-                .ok_or(ErrorKind::ExpectedAbsolutePath {
-                    path: format!("{}", path.display()),
-                })
+                .ok_or_else(|| ErrorKind::ExpectedAbsolutePath.attach("Path", path.display()))
                 .as_json_result()?;
             self.index.set(&repo_name, &abs_path);
         } else {
