@@ -53,7 +53,7 @@ impl<V: VCS, I: Index> Dump<V, I> {
                 below,
             } => {
                 let repo_path = index
-                    .get(&stop.repository)
+                    .get(&stop.repository)?
                     .ok_or(ErrorKind::RepositoryNotInIndex)?;
 
                 let content = code_range(

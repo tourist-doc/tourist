@@ -47,8 +47,12 @@ pub enum ErrorKind {
     RepositoryNotInIndex,
     #[fail(display = "could not read the provided tour file")]
     FailedToReadTour,
+    #[fail(display = "could not read repository index")]
+    FailedToReadIndex,
     #[fail(display = "could not write the provided tour file")]
     FailedToWriteTour,
+    #[fail(display = "could not write repository index")]
+    FailedToWriteIndex,
     #[fail(display = "could not write zip package")]
     FailedToWriteZip,
     #[fail(display = "could not parse the provided tour file")]
@@ -59,6 +63,10 @@ pub enum ErrorKind {
     DiffFailed,
     #[fail(display = "failed to parse the saved git revision")]
     FailedToParseRevision,
+    #[fail(display = "failed to parse the repository index")]
+    FailedToParseIndex,
+    #[fail(display = "failed to serialize repository index")]
+    FailedToSerializeIndex,
     #[fail(display = "file was not saved in UTF-8")]
     EncodingFailure,
     #[fail(display = "something went wrong while creating zip file")]

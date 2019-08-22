@@ -32,7 +32,7 @@ impl<V: VCS, I: Index> Package<V, I> {
         for (repository, path) in files {
             let content = self.vcs.lookup_file_bytes(
                 self.index
-                    .get(&repository)
+                    .get(&repository)?
                     .ok_or(ErrorKind::RepositoryNotInIndex)?
                     .as_absolute_path(),
                 tour.repositories

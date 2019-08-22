@@ -47,7 +47,7 @@ fn resolve_path<I: Index>(
     rel_path: &RelativePathBuf,
 ) -> Result<AbsolutePathBuf> {
     let abs = index
-        .get(repository)
+        .get(repository)?
         .ok_or_else(|| ErrorKind::RepositoryNotInIndex.attach("Repository", repository))?;
     Ok(abs.join_rel(rel_path))
 }
@@ -58,7 +58,7 @@ fn find_path_in_context<I: Index>(
 ) -> Result<(RelativePathBuf, String, AbsolutePathBuf)> {
     let deep = AbsolutePathBuf::new(path.clone())
         .ok_or_else(|| ErrorKind::ExpectedAbsolutePath.attach("Path", path.display()))?;
-    for (repo_name, repo_path) in index.all() {
+    for (repo_name, repo_path) in index.all()? {
         if let Some(rel) = deep.try_relative(repo_path.as_absolute_path()) {
             return Ok((rel, repo_name.to_owned(), repo_path.clone()));
         }
@@ -455,11 +455,10 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
             let abs_path = AbsolutePathBuf::new(path.clone())
                 .ok_or_else(|| ErrorKind::ExpectedAbsolutePath.attach("Path", path.display()))
                 .as_json_result()?;
-            self.index.set(&repo_name, &abs_path);
+            self.index.set(&repo_name, &abs_path).as_json_result()
         } else {
-            self.index.unset(&repo_name);
+            self.index.unset(&repo_name).as_json_result()
         }
-        Ok(())
     }
 
     fn save_all(&self) -> JsonResult<()> {

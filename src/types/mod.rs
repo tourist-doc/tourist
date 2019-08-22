@@ -1,4 +1,6 @@
+use crate::error::{ErrorKind, Result};
 use dirs;
+use failure::ResultExt;
 use serde_json;
 use std::collections::HashMap;
 use std::fs;
@@ -40,10 +42,10 @@ pub struct Tour {
 pub struct FileIndex;
 
 pub trait Index: Send + Sync + 'static + Clone {
-    fn get(&self, repo_name: &str) -> Option<AbsolutePathBuf>;
-    fn set(&self, repo_name: &str, path: &AbsolutePathBuf);
-    fn unset(&self, repo_name: &str);
-    fn all(&self) -> Vec<(String, AbsolutePathBuf)>;
+    fn get(&self, repo_name: &str) -> Result<Option<AbsolutePathBuf>>;
+    fn set(&self, repo_name: &str, path: &AbsolutePathBuf) -> Result<()>;
+    fn unset(&self, repo_name: &str) -> Result<()>;
+    fn all(&self) -> Result<Vec<(String, AbsolutePathBuf)>>;
 }
 
 impl FileIndex {
@@ -53,29 +55,47 @@ impl FileIndex {
 }
 
 impl Index for FileIndex {
-    fn get(&self, repo_name: &str) -> Option<AbsolutePathBuf> {
-        let index: HashMap<String, AbsolutePathBuf> =
-            serde_json::from_str(&fs::read_to_string(self.config_path()).unwrap()).unwrap();
-        index.get(repo_name).cloned()
+    fn get(&self, repo_name: &str) -> Result<Option<AbsolutePathBuf>> {
+        let index: HashMap<String, AbsolutePathBuf> = serde_json::from_str(
+            &fs::read_to_string(self.config_path()).context(ErrorKind::FailedToReadIndex)?,
+        )
+        .context(ErrorKind::FailedToParseIndex)?;
+        Ok(index.get(repo_name).cloned())
     }
 
-    fn set(&self, repo_name: &str, path: &AbsolutePathBuf) {
-        let mut index: HashMap<String, AbsolutePathBuf> =
-            serde_json::from_str(&fs::read_to_string(self.config_path()).unwrap()).unwrap();
+    fn set(&self, repo_name: &str, path: &AbsolutePathBuf) -> Result<()> {
+        let mut index: HashMap<String, AbsolutePathBuf> = serde_json::from_str(
+            &fs::read_to_string(self.config_path()).context(ErrorKind::FailedToReadIndex)?,
+        )
+        .context(ErrorKind::FailedToParseIndex)?;
         index.insert(repo_name.to_owned(), path.clone());
-        fs::write(self.config_path(), serde_json::to_string(&index).unwrap()).unwrap();
+        fs::write(
+            self.config_path(),
+            serde_json::to_string(&index).context(ErrorKind::FailedToSerializeIndex)?,
+        )
+        .context(ErrorKind::FailedToWriteIndex)?;
+        Ok(())
     }
 
-    fn unset(&self, repo_name: &str) {
-        let mut index: HashMap<String, AbsolutePathBuf> =
-            serde_json::from_str(&fs::read_to_string(self.config_path()).unwrap()).unwrap();
+    fn unset(&self, repo_name: &str) -> Result<()> {
+        let mut index: HashMap<String, AbsolutePathBuf> = serde_json::from_str(
+            &fs::read_to_string(self.config_path()).context(ErrorKind::FailedToReadIndex)?,
+        )
+        .context(ErrorKind::FailedToParseIndex)?;
         index.remove(repo_name);
-        fs::write(self.config_path(), serde_json::to_string(&index).unwrap()).unwrap();
+        fs::write(
+            self.config_path(),
+            serde_json::to_string(&index).context(ErrorKind::FailedToSerializeIndex)?,
+        )
+        .context(ErrorKind::FailedToWriteIndex)?;
+        Ok(())
     }
 
-    fn all(&self) -> Vec<(String, AbsolutePathBuf)> {
-        let index: HashMap<String, AbsolutePathBuf> =
-            serde_json::from_str(&fs::read_to_string(self.config_path()).unwrap()).unwrap();
-        index.into_iter().collect()
+    fn all(&self) -> Result<Vec<(String, AbsolutePathBuf)>> {
+        let index: HashMap<String, AbsolutePathBuf> = serde_json::from_str(
+            &fs::read_to_string(self.config_path()).context(ErrorKind::FailedToReadIndex)?,
+        )
+        .context(ErrorKind::FailedToParseIndex)?;
+        Ok(index.into_iter().collect())
     }
 }
