@@ -1,3 +1,4 @@
+use failure::ResultExt;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
@@ -11,7 +12,7 @@ mod vcs;
 
 use command::{Dump, Package, Serve};
 pub use command::{StopMetadata, StopReferenceView, StopView, TourMetadata, TourView, TouristRpc};
-use error::Result;
+use error::{ErrorKind, Result};
 use serialize::parse_tour;
 use types::FileIndex;
 use vcs::Git;
@@ -74,7 +75,10 @@ enum TouristArgs {
 fn run(opts: TouristArgs) -> Result<()> {
     match opts {
         TouristArgs::Dump(args) => {
-            let tour = parse_tour(&fs::read_to_string(args.tour_file)?)?;
+            let tour = parse_tour(
+                &fs::read_to_string(args.tour_file).context(ErrorKind::FailedToReadTour)?,
+            )
+            .context(ErrorKind::FailedToParseTour)?;
             if args.context {
                 Dump::with_context(
                     Git,
@@ -88,8 +92,9 @@ fn run(opts: TouristArgs) -> Result<()> {
             .process(&tour)?;
         }
         TouristArgs::Package(args) => {
-            let tour_source = fs::read_to_string(args.tour_file)?;
-            let tour = parse_tour(&tour_source)?;
+            let tour_source =
+                fs::read_to_string(args.tour_file).context(ErrorKind::FailedToReadTour)?;
+            let tour = parse_tour(&tour_source).context(ErrorKind::FailedToParseTour)?;
             Package::new(Git, FileIndex).process(
                 &args.out.unwrap_or_else(|| PathBuf::from("out.tour.pkg")),
                 tour,

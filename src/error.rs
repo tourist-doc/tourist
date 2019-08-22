@@ -1,79 +1,113 @@
-use std::error;
+use failure::{Backtrace, Context, Fail};
+use jsonrpc_core::Result as JsonResult;
 use std::fmt;
-use std::io;
+use std::fmt::Display;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub trait AsJsonResult<T> {
+    fn as_json_result(self) -> JsonResult<T>;
+}
+
+impl<T, F: Fail> AsJsonResult<T> for std::result::Result<T, F> {
+    fn as_json_result(self) -> JsonResult<T> {
+        self.or_else(|e| {
+            let mut err = jsonrpc_core::Error::internal_error();
+            err.data = Some(format!("{}", e).into());
+            Err(err)
+        })
+    }
+}
+
 #[derive(Debug)]
-pub enum Error {
-    Git2(git2::Error),
-    Utf8(std::str::Utf8Error),
-    IO(io::Error),
-    Serde(serde_json::Error),
-    Zip(zip::result::ZipError),
-    NotInIndex(String),
-    NoCommitForRepository(String),
-    RevParse(String),
+pub struct Error {
+    inner: Context<ErrorKind>,
+    attachments: Vec<String>,
 }
 
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        use Error::*;
-        match self {
-            IO(e) => Some(e),
-            Serde(e) => Some(e),
-            Git2(e) => Some(e),
-            Utf8(e) => Some(e),
-            Zip(e) => Some(e),
-            NotInIndex(_) => None,
-            NoCommitForRepository(_) => None,
-            RevParse(_) => None,
-        }
+#[derive(Clone, Eq, PartialEq, Debug, Fail)]
+pub enum ErrorKind {
+    #[fail(display = "could not find the specified tour")]
+    NoTourFound,
+    #[fail(display = "could not find the specified stop")]
+    NoStopFound,
+    #[fail(display = "could not find the specified git repository")]
+    NoRepositoryFound,
+    #[fail(display = "could not find the specified git commit")]
+    NoCommitFound,
+    #[fail(display = "tour has not been saved and does not have a path")]
+    NoPathForTour,
+    #[fail(display = "no version for repsoitory")]
+    NoVersionForRepository,
+    #[fail(display = "the provided path was not absolute")]
+    ExpectedAbsolutePath,
+    #[fail(display = "path does not appear to be in a Git repository")]
+    PathNotInIndex,
+    #[fail(display = "repsoitory does not appear to be mapped to a git repository")]
+    RepositoryNotInIndex,
+    #[fail(display = "could not read the provided tour file")]
+    FailedToReadTour,
+    #[fail(display = "could not write the provided tour file")]
+    FailedToWriteTour,
+    #[fail(display = "could not write zip package")]
+    FailedToWriteZip,
+    #[fail(display = "could not parse the provided tour file")]
+    FailedToParseTour,
+    #[fail(display = "could not serialize the provided tour file")]
+    FailedToSerializeTour,
+    #[fail(display = "failed to process a git diff")]
+    DiffFailed,
+    #[fail(display = "failed to parse the saved git revision")]
+    FailedToParseRevision,
+    #[fail(display = "file was not saved in UTF-8")]
+    EncodingFailure,
+    #[fail(display = "something went wrong while creating zip file")]
+    ZipFailure,
+}
+
+impl Error {
+    pub fn attach<K: Display, V: Display>(mut self, k: K, v: V) -> Self {
+        self.attachments.push(format!("{}: {}", k, v));
+        self
     }
 }
 
-impl fmt::Display for Error {
+impl Fail for Error {
+    fn cause(&self) -> Option<&Fail> {
+        self.inner.cause()
+    }
+
+    fn backtrace(&self) -> Option<&Backtrace> {
+        self.inner.backtrace()
+    }
+}
+
+impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Error::*;
-        match self {
-            IO(e) => e.fmt(f),
-            Serde(e) => e.fmt(f),
-            Git2(e) => e.fmt(f),
-            Utf8(e) => e.fmt(f),
-            Zip(e) => e.fmt(f),
-            NotInIndex(s) => write!(f, "Could not find repository '{}' in index.", s),
-            NoCommitForRepository(s) => write!(f, "Could not find commit for repository '{}'.", s),
-            RevParse(rev) => write!(f, "Reference '{}' does not point to a blob.", rev),
+        Display::fmt(&self.inner, f)
+    }
+}
+
+impl From<ErrorKind> for Error {
+    fn from(kind: ErrorKind) -> Error {
+        Error {
+            inner: Context::new(kind),
+            attachments: vec![],
         }
     }
 }
 
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::IO(e)
+impl From<Context<ErrorKind>> for Error {
+    fn from(inner: Context<ErrorKind>) -> Error {
+        Error {
+            inner,
+            attachments: vec![],
+        }
     }
 }
 
-impl From<zip::result::ZipError> for Error {
-    fn from(e: zip::result::ZipError) -> Error {
-        Error::Zip(e)
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Error {
-        Error::Serde(e)
-    }
-}
-
-impl From<git2::Error> for Error {
-    fn from(e: git2::Error) -> Error {
-        Error::Git2(e)
-    }
-}
-
-impl From<std::str::Utf8Error> for Error {
-    fn from(e: std::str::Utf8Error) -> Error {
-        Error::Utf8(e)
+impl ErrorKind {
+    pub fn attach<K: Display, V: Display>(self, k: K, v: V) -> Error {
+        Error::from(self).attach(k, v)
     }
 }

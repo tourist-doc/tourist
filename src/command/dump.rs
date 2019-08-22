@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{ErrorKind, Result};
 use crate::types::{Index, Stop, Tour};
 use crate::vcs::VCS;
 
@@ -54,7 +54,7 @@ impl<V: VCS, I: Index> Dump<V, I> {
             } => {
                 let repo_path = index
                     .get(&stop.repository)
-                    .ok_or_else(|| Error::NotInIndex(stop.repository.clone()))?;
+                    .ok_or(ErrorKind::RepositoryNotInIndex)?;
 
                 let content = code_range(
                     vcs.lookup_file_contents(repo_path.as_absolute_path(), commit, &stop.path)?,
@@ -98,7 +98,7 @@ impl<V: VCS, I: Index> Dump<V, I> {
                 let commit = tour
                     .repositories
                     .get(&stop.repository)
-                    .ok_or_else(|| Error::NoCommitForRepository(stop.repository.to_owned()))?;
+                    .ok_or(ErrorKind::NoVersionForRepository)?;
                 self.process_stop(&stop, &commit)
             })
             .collect::<Result<Vec<_>>>()?

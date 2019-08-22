@@ -1,6 +1,6 @@
-use super::error::{ErrorKind, Result};
 use super::interface::TourId;
 use super::Tracker;
+use crate::error::{ErrorKind, Result};
 use crate::serialize;
 use crate::types::Tour;
 use failure::ResultExt;

@@ -1,5 +1,6 @@
-use crate::error::{Error, Result};
+use crate::error::{ErrorKind, Result};
 use crate::types::path::{AbsolutePath, RelativePathBuf};
+use failure::ResultExt;
 use git2::{DiffOptions, Oid, Repository};
 
 mod changes;
@@ -33,7 +34,9 @@ pub trait VCS: Send + Sync + 'static + Clone {
         file_path: &RelativePathBuf,
     ) -> Result<String> {
         let content = self.lookup_file_bytes(repo_path, commit, file_path)?;
-        Ok(std::str::from_utf8(&content)?.to_owned())
+        Ok(std::str::from_utf8(&content)
+            .context(ErrorKind::EncodingFailure)?
+            .to_owned())
     }
 }
 
@@ -42,17 +45,24 @@ pub struct Git;
 
 impl Git {
     fn diff(&self, repo_path: AbsolutePath<'_>, from: &str, to: Option<&str>) -> Result<Changes> {
-        let repo = Repository::open(repo_path.as_path())?;
-        let from_tree = repo.find_commit(Oid::from_str(from)?)?.tree()?;
+        let repo = Repository::open(repo_path.as_path()).context(ErrorKind::NoRepositoryFound)?;
+
+        let from_tree = Oid::from_str(from)
+            .and_then(|oid| repo.find_commit(oid)?.tree())
+            .context(ErrorKind::NoCommitFound)?;
         let mut opts = DiffOptions::new();
         opts.minimal(true);
         opts.ignore_whitespace_eol(true);
 
         let diff = if let Some(to) = to {
-            let to_tree = repo.find_commit(Oid::from_str(to)?)?.tree()?;
-            repo.diff_tree_to_tree(Some(&from_tree), Some(&to_tree), Some(&mut opts))?
+            let to_tree = Oid::from_str(to)
+                .and_then(|oid| repo.find_commit(oid)?.tree())
+                .context(ErrorKind::NoCommitFound)?;
+            repo.diff_tree_to_tree(Some(&from_tree), Some(&to_tree), Some(&mut opts))
+                .context(ErrorKind::DiffFailed)?
         } else {
-            repo.diff_tree_to_workdir(Some(&from_tree), Some(&mut opts))?
+            repo.diff_tree_to_workdir(Some(&from_tree), Some(&mut opts))
+                .context(ErrorKind::DiffFailed)?
         };
 
         let mut file_events = vec![];
@@ -79,7 +89,8 @@ impl Git {
                 }
                 true
             }),
-        )?;
+        )
+        .context(ErrorKind::DiffFailed)?;
         let mut changes = Changes::new();
         file_events
             .into_iter()
@@ -93,8 +104,11 @@ impl Git {
 
 impl VCS for Git {
     fn get_current_version(&self, repo_path: AbsolutePath<'_>) -> Result<String> {
-        let repo = Repository::open(repo_path.as_path())?;
-        let id = repo.head()?.peel_to_commit()?.id();
+        let repo = Repository::open(repo_path.as_path()).context(ErrorKind::NoRepositoryFound)?;
+        let id = repo
+            .head()
+            .and_then(|head| Ok(head.peel_to_commit()?.id()))
+            .context(ErrorKind::NoCommitFound)?;
         Ok(format!("{}", id))
     }
 
@@ -104,10 +118,12 @@ impl VCS for Git {
         commit: &str,
         file_path: &RelativePathBuf,
     ) -> Result<Vec<u8>> {
-        let repo = Repository::open(repo_path.as_path())?;
+        let repo = Repository::open(repo_path.as_path()).context(ErrorKind::NoRepositoryFound)?;
         let rev = format!("{}:{}", commit, file_path.as_git_path());
-        let obj = repo.revparse_single(&rev)?;
-        let blob = obj.as_blob().ok_or(Error::RevParse(rev))?;
+        let obj = repo
+            .revparse_single(&rev)
+            .context(ErrorKind::FailedToParseRevision)?;
+        let blob = obj.as_blob().ok_or(ErrorKind::FailedToParseRevision)?;
         Ok(blob.content().to_vec())
     }
 

@@ -1,3 +1,4 @@
+use crate::error::{AsJsonResult, ErrorKind, Result};
 use crate::types::path::{AbsolutePathBuf, RelativePathBuf};
 use crate::types::{Index, Stop, StopReference, Tour};
 use crate::vcs::VCS;
@@ -13,10 +14,8 @@ use uuid::Uuid;
 #[cfg(test)]
 mod tests;
 
-mod error;
 mod interface;
 mod io;
-use error::{AsJsonResult, ErrorKind, Result};
 pub use interface::*;
 use io::{AsyncTourFileManager, TourFileManager};
 
