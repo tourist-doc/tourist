@@ -5,6 +5,7 @@ use std::process;
 use structopt::StructOpt;
 
 mod command;
+mod config;
 mod error;
 mod index;
 mod serialize;
