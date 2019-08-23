@@ -494,9 +494,14 @@ impl<V: VCS, I: Index> Serve<V, I> {
         Serve { vcs, index }
     }
 
-    pub fn process(&self) {
+    pub fn process(&self, init_tours: Vec<Tour>) {
         let mut io = jsonrpc_core::IoHandler::new();
-        let tours = Arc::new(RwLock::new(HashMap::new()));
+        let tours = Arc::new(RwLock::new(
+            init_tours
+                .into_iter()
+                .map(|tour| (tour.id.clone(), tour))
+                .collect(),
+        ));
         let manager = AsyncTourFileManager::new(Arc::clone(&tours));
         manager.start();
         io.extend_with(

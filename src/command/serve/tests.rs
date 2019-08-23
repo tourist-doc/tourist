@@ -91,7 +91,7 @@ impl VCS for MockVCS {
         _commit: &str,
         _file_path: &RelativePathBuf,
     ) -> error::Result<Vec<u8>> {
-        unimplemented!();
+        panic!("No implementation needed yet. Add one if necessary.")
     }
 }
 

@@ -104,7 +104,7 @@ fn run(opts: TouristArgs) -> Result<()> {
             )?;
         }
         TouristArgs::Serve(_) => {
-            Serve::new(Git, FileIndex).process();
+            Serve::new(Git, FileIndex).process(config::get_default_tours()?);
         }
     }
 
