@@ -2,6 +2,7 @@ use crate::error::{ErrorKind, Result};
 use crate::serialize;
 use crate::types::path::AbsolutePathBuf;
 use crate::types::Tour;
+use dotenv;
 use failure::ResultExt;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -10,22 +11,51 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
 
-pub fn config_path() -> PathBuf {
-    // TODO: Set this with an environment variable
-    dirs::home_dir().unwrap().join(".tourist")
+fn config_path() -> PathBuf {
+    if let Ok(p) = dotenv::var("TOURIST_CONFIG") {
+        PathBuf::from(p)
+    } else {
+        dirs::home_dir()
+            .expect("Operating system does not have a home directory.")
+            .join(".tourist")
+    }
 }
 
-#[derive(Serialize, Deserialize)]
+pub fn config() -> Config {
+    let config = fs::read_to_string(config_path())
+        .ok()
+        .and_then(|contents| serde_json::from_str(&contents).ok());
+    if let Some(c) = config {
+        dbg!(c)
+    } else {
+        eprintln!(
+            "failed to parse config file at '{}', running with default config",
+            config_path().display()
+        );
+        Config {
+            index: HashMap::new(),
+            dirs: vec![],
+        }
+    }
+}
+
+pub fn write_config(config: Config) -> Result<()> {
+    fs::write(
+        config_path(),
+        serde_json::to_string(&config).context(ErrorKind::FailedToSerializeIndex)?,
+    )
+    .context(ErrorKind::FailedToWriteIndex)?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub index: HashMap<String, AbsolutePathBuf>,
     pub dirs: Vec<AbsolutePathBuf>,
 }
 
 pub fn get_default_tours() -> Result<Vec<Tour>> {
-    let config: Config = serde_json::from_str(
-        &fs::read_to_string(config_path()).context(ErrorKind::FailedToReadIndex)?,
-    )
-    .context(ErrorKind::FailedToParseIndex)?;
+    let config: Config = config();
     collect_tours(config.dirs.clone())
 }
 
