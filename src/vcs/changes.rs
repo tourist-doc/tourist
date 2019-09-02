@@ -315,4 +315,45 @@ mod tests {
 
         assert_eq!(expected, actual);
     }
+
+    #[test]
+    fn adjust_line_deleted() {
+        for line in &[1, 2, 5, 100, 5000] {
+            {
+                let changes = FileChanges::Deleted;
+                assert!(changes.adjust_line(*line).is_none());
+            }
+            {
+                let changes = FileChanges::Changed {
+                    changes: vec![].into_iter().collect(),
+                    additions: vec![].into_iter().collect(),
+                    deletions: vec![*line].into_iter().collect(),
+                };
+                assert!(changes.adjust_line(*line).is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn adjust_line_direct() {
+        for line in &[1, 2, 5, 100, 5000] {
+            {
+                let changes = FileChanges::Changed {
+                    changes: vec![(*line, 42)].into_iter().collect(),
+                    additions: vec![].into_iter().collect(),
+                    deletions: vec![].into_iter().collect(),
+                };
+                assert_eq!(changes.adjust_line(*line), Some(42));
+            }
+            {
+                let changes = FileChanges::Renamed {
+                    changes: vec![(*line, 42)].into_iter().collect(),
+                    additions: vec![].into_iter().collect(),
+                    deletions: vec![].into_iter().collect(),
+                    new_name: RelativePathBuf::from("some/path".to_owned()),
+                };
+                assert_eq!(changes.adjust_line(*line), Some(42));
+            }
+        }
+    }
 }

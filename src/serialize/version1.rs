@@ -11,7 +11,7 @@ pub const PROTOCOL_VERSION: &str = "1.0";
 #[serde(rename_all = "camelCase")]
 pub struct Child {
     pub tour_id: String,
-    pub stop_num: usize,
+    pub stop_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -73,7 +73,7 @@ impl Into<types::Tour> for TourFile {
                     id: stop.id,
                     title: stop.title,
                     description: stop.body,
-                    path: stop.rel_path.as_str().replace("\\", "/").into(),
+                    path: stop.rel_path.replace("\\", "/").into(),
                     repository: stop.repository,
                     line: stop.line,
                     children: stop
@@ -81,7 +81,7 @@ impl Into<types::Tour> for TourFile {
                         .into_iter()
                         .map(|c| types::StopReference {
                             tour_id: c.tour_id,
-                            stop_id: None,
+                            stop_id: c.stop_id,
                         })
                         .collect::<Vec<_>>(),
                 })
@@ -118,7 +118,7 @@ impl From<types::Tour> for TourFile {
                         .into_iter()
                         .map(|c| Child {
                             tour_id: c.tour_id,
-                            stop_num: 0,
+                            stop_id: c.stop_id,
                         })
                         .collect::<Vec<_>>(),
                 })
