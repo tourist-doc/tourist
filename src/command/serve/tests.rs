@@ -6,7 +6,7 @@ use crate::error;
 use crate::index::Index;
 use crate::types::path::{AbsolutePath, AbsolutePathBuf, RelativePathBuf};
 use crate::types::{Stop, StopReference, Tour};
-use crate::vcs::{Changes, FileChanges, VCS};
+use crate::vcs::{Changes, FileChanges, LineChanges, VCS};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -649,9 +649,11 @@ fn locate_stop_test() {
     changes.0.insert(
         RelativePathBuf::from("bar/baz.txt".to_owned()),
         FileChanges::Changed {
-            changes: vec![(100, 105)].into_iter().collect(),
-            deletions: vec![].into_iter().collect(),
-            additions: vec![].into_iter().collect(),
+            line_changes: LineChanges {
+                changes: vec![(100, 105)].into_iter().collect(),
+                deletions: vec![].into_iter().collect(),
+                additions: vec![].into_iter().collect(),
+            },
         },
     );
     tourist.vcs.last_changes = Some(changes);
@@ -732,9 +734,11 @@ fn refresh_tour_test() {
     changes.0.insert(
         RelativePathBuf::from("foo/bar.txt".to_owned()),
         FileChanges::Changed {
-            changes: vec![(100, 105)].into_iter().collect(),
-            deletions: vec![].into_iter().collect(),
-            additions: vec![].into_iter().collect(),
+            line_changes: LineChanges {
+                changes: vec![(100, 105)].into_iter().collect(),
+                deletions: vec![].into_iter().collect(),
+                additions: vec![].into_iter().collect(),
+            },
         },
     );
     tourist.vcs.last_changes = Some(changes);

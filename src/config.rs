@@ -26,7 +26,7 @@ pub fn config() -> Config {
         .ok()
         .and_then(|contents| serde_json::from_str(&contents).ok());
     if let Some(c) = config {
-        dbg!(c)
+        c
     } else {
         eprintln!(
             "failed to parse config file at '{}', running with default config",

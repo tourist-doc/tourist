@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+#[cfg(test)]
+pub mod arbitrary;
 pub mod path;
 
 use path::RelativePathBuf;

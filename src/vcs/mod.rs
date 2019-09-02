@@ -5,7 +5,7 @@ use git2::{DiffOptions, Oid, Repository};
 
 mod changes;
 
-pub use changes::{Changes, FileChanges};
+pub use changes::{Changes, FileChanges, LineChanges};
 use changes::{DiffFileEvent, DiffLineEvent};
 
 pub trait VCS: Send + Sync + 'static + Clone {
@@ -143,7 +143,7 @@ impl VCS for Git {
 
 #[cfg(test)]
 mod tests {
-    use super::changes::FileChanges;
+    use super::changes::{FileChanges, LineChanges};
     use super::{Git, VCS};
     use crate::types::path::{AbsolutePathBuf, RelativePathBuf};
     use git2::{Commit, ObjectType, Oid, Repository, Signature};
@@ -215,9 +215,11 @@ mod tests {
 
         assert_eq!(
             Some(&FileChanges::Changed {
-                changes: vec![(1, 2)].into_iter().collect(),
-                additions: vec![1, 3].into_iter().collect(),
-                deletions: vec![2].into_iter().collect(),
+                line_changes: LineChanges {
+                    changes: vec![(1, 2)].into_iter().collect(),
+                    additions: vec![1, 3].into_iter().collect(),
+                    deletions: vec![2].into_iter().collect(),
+                }
             }),
             changes.for_file(&RelativePathBuf::from(Path::new("test.txt")))
         )
