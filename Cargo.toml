@@ -34,3 +34,6 @@ jsonrpc-core-client = "12.1"
 uuid = { version = "0.7", features = ["v4"] }
 failure = "0.1"
 dotenv = "0.14"
+slog = "2.5"
+slog-scope = "4.1"
+slog-term = "2.4"

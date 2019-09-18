@@ -1,4 +1,7 @@
 use failure::ResultExt;
+use slog;
+use slog::{o, Drain};
+use slog_term;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
@@ -21,6 +24,8 @@ use vcs::Git;
 
 #[derive(StructOpt)]
 struct DumpArgs {
+    #[structopt(short = "v", long = "verbose", help = "Log output to .tourist.log.")]
+    verbose: bool,
     #[structopt(
         short = "c",
         long = "context",
@@ -39,6 +44,8 @@ struct DumpArgs {
 
 #[derive(StructOpt)]
 struct PackageArgs {
+    #[structopt(short = "v", long = "verbose", help = "Log output to .tourist.log.")]
+    verbose: bool,
     #[structopt(
         short = "o",
         long = "out",
@@ -52,7 +59,10 @@ struct PackageArgs {
 }
 
 #[derive(StructOpt)]
-struct ServeArgs {}
+struct ServeArgs {
+    #[structopt(short = "v", long = "verbose", help = "Log output to .tourist.log.")]
+    verbose: bool,
+}
 
 #[derive(StructOpt)]
 #[structopt(
@@ -72,6 +82,16 @@ enum TouristArgs {
         about = "Start a JSON-RPC 2.0 that implements the tourist protocol."
     )]
     Serve(ServeArgs),
+}
+
+impl TouristArgs {
+    fn verbose(&self) -> bool {
+        match self {
+            TouristArgs::Dump(a) => a.verbose,
+            TouristArgs::Package(a) => a.verbose,
+            TouristArgs::Serve(a) => a.verbose,
+        }
+    }
 }
 
 fn run(opts: TouristArgs) -> Result<()> {
@@ -112,7 +132,30 @@ fn run(opts: TouristArgs) -> Result<()> {
 }
 
 fn main() {
-    if let Err(e) = run(TouristArgs::from_args()) {
+    let args = TouristArgs::from_args();
+
+    let logger = if args.verbose() {
+        let log_path = ".tourist.log";
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(log_path)
+            .unwrap();
+
+        slog::Logger::root(
+            slog_term::FullFormat::new(slog_term::PlainSyncDecorator::new(file))
+                .build()
+                .fuse(),
+            o!(),
+        )
+    } else {
+        slog::Logger::root(slog::Discard, o!())
+    };
+
+    let _guard = slog_scope::set_global_logger(logger);
+
+    if let Err(e) = run(args) {
         eprintln!("{}", e);
         process::exit(1);
     }

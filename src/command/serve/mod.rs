@@ -7,6 +7,7 @@ use failure::ResultExt;
 use jsonrpc_core;
 use jsonrpc_core::Result as JsonResult;
 use jsonrpc_stdio_server::ServerBuilder;
+use slog_scope::info;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -495,6 +496,7 @@ impl<V: VCS, I: Index> Serve<V, I> {
     }
 
     pub fn process(&self, init_tours: Vec<Tour>) {
+        info!("running server with initial tours {:?}", init_tours);
         let mut io = jsonrpc_core::IoHandler::new();
         let tours = Arc::new(RwLock::new(
             init_tours
@@ -514,6 +516,7 @@ impl<V: VCS, I: Index> Serve<V, I> {
             }
             .to_delegate(),
         );
+        info!("starting tourist server");
         ServerBuilder::new(io).build();
     }
 }

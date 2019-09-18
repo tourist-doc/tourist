@@ -6,6 +6,7 @@ use dotenv;
 use failure::ResultExt;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use slog_scope::error;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs;
@@ -28,7 +29,7 @@ pub fn config() -> Config {
     if let Some(c) = config {
         c
     } else {
-        eprintln!(
+        error!(
             "failed to parse config file at '{}', running with default config",
             config_path().display()
         );
