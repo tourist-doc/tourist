@@ -158,7 +158,7 @@ pub trait TouristRpc {
     ) -> JsonResult<()>;
 
     /// Unlink a tour stop from another tour or tour stop.
-    #[rpc(name = "link_stop")]
+    #[rpc(name = "unlink_stop")]
     fn unlink_stop(
         &self,
         tour_id: TourId,
