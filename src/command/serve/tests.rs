@@ -488,6 +488,148 @@ fn edit_stop_metadata_test() {
 }
 
 #[test]
+fn move_stop_test() {
+    let (tourist, _, index) = test_instance();
+    index
+        .set(
+            "my-repo",
+            &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
+        )
+        .unwrap();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![Stop {
+                id: "STOPID".to_owned(),
+                title: "A stop on the tour".to_owned(),
+                description: "".to_owned(),
+                path: RelativePathBuf::from("foo/bar.txt".to_owned()),
+                repository: "my-repo".to_owned(),
+                line: 100,
+                children: vec![],
+            }],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![("my-repo".to_owned(), "COMMIT".to_owned())]
+                .into_iter()
+                .collect(),
+        },
+    );
+
+    tourist
+        .move_stop(
+            "TOURID".to_owned(),
+            "STOPID".to_owned(),
+            PathBuf::from("/foo/bar/baz.txt"),
+            500,
+        )
+        .unwrap();
+
+    let tours = tourist.get_tours();
+    let tour = tours.get("TOURID").unwrap();
+    assert_eq!(tour.stops[0].line, 500,);
+    assert_eq!(
+        tour.stops[0].path,
+        RelativePathBuf::from("bar/baz.txt".to_owned())
+    );
+}
+
+#[test]
+fn reorder_stop_test() {
+    let (tourist, _, _) = test_instance();
+    tourist.get_tours_mut().insert(
+        "TOURID".to_owned(),
+        Tour {
+            generator: 0,
+            id: "TOURID".to_owned(),
+            title: "My first tour".to_owned(),
+            description: "".to_owned(),
+            stops: vec![
+                Stop {
+                    id: "0".to_owned(),
+                    title: "A stop on the tour".to_owned(),
+                    description: "".to_owned(),
+                    path: RelativePathBuf::from("foo/bar.txt".to_owned()),
+                    repository: "my-repo".to_owned(),
+                    line: 100,
+                    children: vec![],
+                },
+                Stop {
+                    id: "1".to_owned(),
+                    title: "Another stop on the tour".to_owned(),
+                    description: "".to_owned(),
+                    path: RelativePathBuf::from("foo/baz.txt".to_owned()),
+                    repository: "my-repo".to_owned(),
+                    line: 200,
+                    children: vec![],
+                },
+                Stop {
+                    id: "2".to_owned(),
+                    title: "A third stop on the tour".to_owned(),
+                    description: "".to_owned(),
+                    path: RelativePathBuf::from("foo/qux.txt".to_owned()),
+                    repository: "my-repo".to_owned(),
+                    line: 300,
+                    children: vec![],
+                },
+            ],
+            protocol_version: "1.0".to_owned(),
+            repositories: vec![("my-repo".to_owned(), "COMMIT".to_owned())]
+                .into_iter()
+                .collect(),
+        },
+    );
+
+    {
+        tourist
+            .reorder_stop("TOURID".to_owned(), "0".to_owned(), 1)
+            .unwrap();
+        let tours = tourist.get_tours();
+        let tour = tours.get("TOURID").unwrap();
+        assert_eq!(
+            tour.stops.iter().map(|x| x.id.as_str()).collect::<Vec<_>>(),
+            vec!["1", "0", "2"]
+        );
+    }
+    {
+        tourist
+            .reorder_stop("TOURID".to_owned(), "0".to_owned(), 5)
+            .unwrap();
+        let tours = tourist.get_tours();
+        let tour = tours.get("TOURID").unwrap();
+        assert_eq!(
+            tour.stops.iter().map(|x| x.id.as_str()).collect::<Vec<_>>(),
+            vec!["1", "2", "0"]
+        );
+    }
+    {
+        tourist
+            .reorder_stop("TOURID".to_owned(), "0".to_owned(), -1)
+            .unwrap();
+        let tours = tourist.get_tours();
+        let tour = tours.get("TOURID").unwrap();
+        assert_eq!(
+            tour.stops.iter().map(|x| x.id.as_str()).collect::<Vec<_>>(),
+            vec!["1", "0", "2"]
+        );
+    }
+    {
+        tourist
+            .reorder_stop("TOURID".to_owned(), "0".to_owned(), -100)
+            .unwrap();
+        let tours = tourist.get_tours();
+        let tour = tours.get("TOURID").unwrap();
+        assert_eq!(
+            tour.stops.iter().map(|x| x.id.as_str()).collect::<Vec<_>>(),
+            vec!["0", "1", "2"]
+        );
+    }
+}
+
+#[test]
 fn link_stop_test() {
     let (tourist, _, _) = test_instance();
     tourist.get_tours_mut().insert(

@@ -8,7 +8,9 @@ use jsonrpc_core;
 use jsonrpc_core::Result as JsonResult;
 use jsonrpc_stdio_server::ServerBuilder;
 use slog_scope::info;
+use std::cmp;
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use uuid::Uuid;
@@ -364,6 +366,79 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     ) -> JsonResult<()> {
         self.with_stop_mut(&tour_id, &stop_id, |stop| {
             delta.apply_to(stop);
+            Ok(())
+        })
+        .as_json_result()
+    }
+
+    fn move_stop(
+        &self,
+        tour_id: TourId,
+        stop_id: StopId,
+        path: PathBuf,
+        line: usize,
+    ) -> JsonResult<()> {
+        let (rel_path, repo, repo_path) =
+            find_path_in_context(&self.index, path).as_json_result()?;
+        // Two things need to happen here:
+        // 1. The stop needs to be moved to the approapriate relative stop/line.
+        // 2. If this change happens to modify `tour.repositories`, that needs to be handled.
+        // Unfortunately, both of these operations could fail -- the stop might not exist, and the
+        // new file might not be in a git repository. We wouldn't want to make one mutation, then
+        // crash, and not make the other. The solution is to:
+        self.with_tour_mut(&tour_id, |tour| {
+            // First, make sure the stop actually exists in the tour
+            tour.stops.iter().find(|s| s.id == stop_id).ok_or_else(|| {
+                ErrorKind::NoStopFound
+                    .attach("Tour ID", &tour_id)
+                    .attach("Stop ID", &stop_id)
+            })?;
+            // Then, make the change to tour.repositories
+            tour.repositories.insert(
+                repo,
+                self.vcs
+                    .get_current_version(repo_path.as_absolute_path())
+                    .context(ErrorKind::DiffFailed)?,
+            );
+            Ok(())
+        })
+        .as_json_result()?;
+        // Finally, once we're sure that no more failure can occur, make the change to the stop
+        self.with_stop_mut(&tour_id, &stop_id, |stop| {
+            stop.path = rel_path;
+            stop.line = line;
+            Ok(())
+        })
+        .as_json_result()
+    }
+
+    fn reorder_stop(
+        &self,
+        tour_id: TourId,
+        stop_id: StopId,
+        position_delta: isize,
+    ) -> JsonResult<()> {
+        // Clamp `val` to be within `min` and `max` inclusive. Assumes `min <= max`
+        fn clamp(val: isize, min: isize, max: isize) -> isize {
+            cmp::min(cmp::max(val, min), max)
+        }
+
+        self.with_tour_mut(&tour_id, |tour| {
+            let idx = tour
+                .stops
+                .iter()
+                .position(|stop| stop.id == stop_id)
+                .ok_or_else(|| {
+                    ErrorKind::NoStopFound
+                        .attach("Tour ID", &tour_id)
+                        .attach("Stop ID", stop_id)
+                })? as isize;
+            let end_of_list = (tour.stops.len() - 1) as isize;
+            tour.stops.swap(
+                usize::try_from(idx).context(ErrorKind::UnknownFailure)?,
+                usize::try_from(clamp(idx + position_delta, 0, end_of_list))
+                    .context(ErrorKind::UnknownFailure)?,
+            );
             Ok(())
         })
         .as_json_result()

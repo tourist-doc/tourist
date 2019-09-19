@@ -71,6 +71,8 @@ pub enum ErrorKind {
     EncodingFailure,
     #[fail(display = "something went wrong while creating zip file")]
     ZipFailure,
+    #[fail(display = "unknown error")]
+    UnknownFailure,
 }
 
 impl Error {

@@ -146,6 +146,26 @@ pub trait TouristRpc {
         delta: StopMetadata,
     ) -> JsonResult<()>;
 
+    /// Move a stop to a different place in the codebase.
+    #[rpc(name = "move_stop")]
+    fn move_stop(
+        &self,
+        tour_id: TourId,
+        stop_id: StopId,
+        path: PathBuf,
+        line: usize,
+    ) -> JsonResult<()>;
+
+    /// Change the order of a tour's stops. Position delta is applied to the position of the stop in
+    /// the list, bounded by the length of the list.
+    #[rpc(name = "reorder_stop")]
+    fn reorder_stop(
+        &self,
+        tour_id: TourId,
+        stop_id: StopId,
+        position_delta: isize,
+    ) -> JsonResult<()>;
+
     /// Link a tour stop to another tour or tour stop. If `other_stop_id` is `None`, the link will
     /// go to the tour's landing page. Otherwise the link will go to the stop itself.
     #[rpc(name = "link_stop")]
