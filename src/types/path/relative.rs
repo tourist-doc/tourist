@@ -58,9 +58,6 @@ impl From<&Path> for RelativePathBuf {
 #[cfg(test)]
 mod tests {
     use super::RelativePathBuf;
-    use quickcheck::TestResult;
-    use quickcheck_macros::quickcheck;
-    use std::path::PathBuf;
 
     #[test]
     fn from_components_works() {
@@ -69,17 +66,6 @@ mod tests {
         assert_eq!(path.0.len(), 2);
         assert_eq!(path.0[0], "some");
         assert_eq!(path.0[1], "dir");
-    }
-
-    #[quickcheck]
-    fn components_consistent_with_path(s: String) -> TestResult {
-        let path = PathBuf::from(s.clone());
-        if path.is_absolute() {
-            return TestResult::discard();
-        }
-        TestResult::from_bool(
-            path.components().count() == RelativePathBuf::from(s).components().count(),
-        )
     }
 
     #[test]

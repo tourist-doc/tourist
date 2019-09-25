@@ -59,6 +59,9 @@ fn create_simple_tour() {
     let mut server = Server::new();
     let id = rpc!(server, "create_tour", vec!["A tour"], String);
     let results = rpc!(server, "list_tours", vec![], Vec<(String, String)>);
-    assert_eq!(id, results[0].0);
-    assert_eq!("A tour", results[0].1);
+    let new_tour = results
+        .iter()
+        .find(|(rid, _)| rid == &id)
+        .expect("no tour created with expected id");
+    assert_eq!("A tour", new_tour.1);
 }

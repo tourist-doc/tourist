@@ -7,6 +7,7 @@ use crate::index::Index;
 use crate::types::path::{AbsolutePath, AbsolutePathBuf, RelativePathBuf};
 use crate::types::{Stop, StopReference, Tour};
 use crate::vcs::{Changes, FileChanges, LineChanges, VCS};
+use dirs;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -353,11 +354,9 @@ fn forget_tour_test() {
 #[test]
 fn create_stop_test() {
     let (tourist, _, index) = test_instance();
+    let root = dirs::download_dir().unwrap();
     index
-        .set(
-            "my-repo",
-            &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
-        )
+        .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
         .unwrap();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
@@ -375,7 +374,7 @@ fn create_stop_test() {
         .create_stop(
             "TOURID".to_owned(),
             "A tour stop".to_owned(),
-            PathBuf::from("/foo/bar/baz"),
+            root.join("foo").join("bar").join("baz"),
             100,
         )
         .unwrap();
@@ -752,11 +751,9 @@ fn unlink_stop_test() {
 #[test]
 fn locate_stop_test() {
     let (mut tourist, _, index) = test_instance();
+    let root = dirs::download_dir().unwrap();
     index
-        .set(
-            "my-repo",
-            &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
-        )
+        .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
         .unwrap();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
@@ -784,7 +781,7 @@ fn locate_stop_test() {
         .locate_stop("TOURID".to_owned(), "STOPID".to_owned(), true)
         .unwrap()
         .unwrap();
-    assert_eq!(path, PathBuf::from("/foo/bar/baz.txt"));
+    assert_eq!(path, root.join("foo").join("bar").join("baz.txt"));
     assert_eq!(line, 100);
 
     let mut changes = Changes::new();
@@ -803,7 +800,7 @@ fn locate_stop_test() {
         .locate_stop("TOURID".to_owned(), "STOPID".to_owned(), false)
         .unwrap()
         .unwrap();
-    assert_eq!(path, PathBuf::from("/foo/bar/baz.txt"));
+    assert_eq!(path, root.join("foo").join("bar").join("baz.txt"));
     assert_eq!(line, 105);
 }
 
@@ -843,11 +840,9 @@ fn remove_stop_test() {
 #[test]
 fn refresh_tour_test() {
     let (mut tourist, _, index) = test_instance();
+    let root = dirs::download_dir().unwrap();
     index
-        .set(
-            "my-repo",
-            &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
-        )
+        .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
         .unwrap();
     tourist.get_tours_mut().insert(
         "TOURID".to_owned(),
@@ -1009,11 +1004,12 @@ fn delete_tour_test() {
 #[test]
 fn index_repository_test() {
     let (tourist, _, index) = test_instance();
+    let root = dirs::download_dir().unwrap();
     tourist
-        .index_repository("my-repo".to_owned(), Some(PathBuf::from("/foo/bar")))
+        .index_repository("my-repo".to_owned(), Some(root.join("foo")))
         .unwrap();
     assert_eq!(
         index.get("my-repo").unwrap().unwrap(),
-        AbsolutePathBuf::new(PathBuf::from("/foo/bar")).unwrap()
+        AbsolutePathBuf::new(root.join("foo")).unwrap()
     );
 }
