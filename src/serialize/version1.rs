@@ -24,6 +24,7 @@ pub struct Stop {
     pub repository: String,
     pub line: usize,
     pub child_stops: Vec<Child>,
+    pub broken: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -84,6 +85,7 @@ impl Into<types::Tour> for TourFile {
                             stop_id: c.stop_id,
                         })
                         .collect::<Vec<_>>(),
+                    broken: stop.broken,
                 })
                 .collect::<Vec<_>>(),
             repositories: self
@@ -121,6 +123,7 @@ impl From<types::Tour> for TourFile {
                             stop_id: c.stop_id,
                         })
                         .collect::<Vec<_>>(),
+                    broken: stop.broken,
                 })
                 .collect::<Vec<_>>(),
             repositories: tour

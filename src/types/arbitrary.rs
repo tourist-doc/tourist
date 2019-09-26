@@ -30,6 +30,7 @@ impl Arbitrary for Stop {
             repository: Arbitrary::arbitrary(g),
             line: Arbitrary::arbitrary(g),
             children: Arbitrary::arbitrary(g),
+            broken: None,
         }
     }
 }

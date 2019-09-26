@@ -242,6 +242,7 @@ fn view_tour_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -400,6 +401,7 @@ fn view_stop_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -439,6 +441,7 @@ fn edit_stop_metadata_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -503,6 +506,7 @@ fn move_stop_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -548,6 +552,7 @@ fn reorder_stop_test() {
             description: "".to_owned(),
             stops: vec![
                 Stop {
+                    broken: None,
                     id: "0".to_owned(),
                     title: "A stop on the tour".to_owned(),
                     description: "".to_owned(),
@@ -557,6 +562,7 @@ fn reorder_stop_test() {
                     children: vec![],
                 },
                 Stop {
+                    broken: None,
                     id: "1".to_owned(),
                     title: "Another stop on the tour".to_owned(),
                     description: "".to_owned(),
@@ -566,6 +572,7 @@ fn reorder_stop_test() {
                     children: vec![],
                 },
                 Stop {
+                    broken: None,
                     id: "2".to_owned(),
                     title: "A third stop on the tour".to_owned(),
                     description: "".to_owned(),
@@ -639,6 +646,7 @@ fn link_stop_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -697,6 +705,7 @@ fn unlink_stop_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -763,6 +772,7 @@ fn locate_stop_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -815,6 +825,7 @@ fn remove_stop_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -852,6 +863,7 @@ fn refresh_tour_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -901,6 +913,7 @@ fn save_tour_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -937,6 +950,7 @@ fn save_all_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),
@@ -975,6 +989,7 @@ fn delete_tour_test() {
             title: "My first tour".to_owned(),
             description: "".to_owned(),
             stops: vec![Stop {
+                broken: None,
                 id: "STOPID".to_owned(),
                 title: "A stop on the tour".to_owned(),
                 description: "".to_owned(),

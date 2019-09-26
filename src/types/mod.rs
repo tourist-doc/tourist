@@ -21,6 +21,9 @@ pub struct Stop {
     pub repository: String,
     pub line: usize,
     pub children: Vec<StopReference>,
+    /// If `None`, the stop is not broken. If `Some(s)`, `s` should hold a short message about what
+    /// went wrong.
+    pub broken: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

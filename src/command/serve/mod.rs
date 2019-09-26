@@ -288,7 +288,14 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
                     .diff_with_version(repo_path.as_absolute_path(), &tour_version, &target_version)
                     .context(ErrorKind::DiffFailed)?;
                 if let Some(file_changes) = changes.for_file(&stop.path) {
-                    stop.line = file_changes.adjust_line(stop.line).unwrap();
+                    match file_changes.adjust_line(stop.line) {
+                        Some(line) => {
+                            stop.line = line;
+                        }
+                        None => {
+                            stop.broken = Some("line was deleted".to_owned());
+                        }
+                    }
                 }
                 new_versions.insert(stop.repository.clone(), target_version.clone());
             }
@@ -325,6 +332,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
             repository: repo.clone(),
             line,
             children: Vec::new(),
+            broken: None,
         };
         let mut tours = self.get_tours_mut();
         let tour = tours
@@ -407,6 +415,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         self.with_stop_mut(&tour_id, &stop_id, |stop| {
             stop.path = rel_path;
             stop.line = line;
+            stop.broken = None;
             Ok(())
         })
         .as_json_result()
@@ -484,13 +493,18 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     ) -> JsonResult<Option<(PathBuf, usize)>> {
         self.with_tour(&tour_id, |tour| {
             self.with_stop(&tour_id, &stop_id, |stop| {
-                let version = tour.repositories.get(&stop.repository).ok_or_else(|| {
-                    ErrorKind::NoVersionForRepository.attach("Repository", stop.repository.clone())
-                })?;
+                if stop.broken.is_some() {
+                    // broken stop, can't locate
+                    return Ok(None);
+                }
                 let path = resolve_path(&self.index, &stop.repository, &stop.path)?;
                 let line = if naive {
                     Some(stop.line)
                 } else {
+                    let version = tour.repositories.get(&stop.repository).ok_or_else(|| {
+                        ErrorKind::NoVersionForRepository
+                            .attach("Repository", stop.repository.clone())
+                    })?;
                     let changes = self
                         .vcs
                         .diff_with_worktree(path.as_absolute_path(), version)
@@ -501,11 +515,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
                         Some(stop.line)
                     }
                 };
-                Ok(if let Some(line) = line {
-                    Some((path.as_path_buf().clone(), line))
-                } else {
-                    None
-                })
+                Ok(line.map(|l| (path.as_path_buf().clone(), l)))
             })
         })
         .as_json_result()
