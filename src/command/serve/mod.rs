@@ -230,6 +230,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         tours.insert(tour.id.clone(), tour);
         if edit {
             self.set_editable(id.clone(), true);
+            self.refresh_tour(id.clone(), None)?;
         }
         Ok(id)
     }
@@ -237,6 +238,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     fn set_tour_edit(&self, tour_id: TourId, edit: bool) -> JsonResult<()> {
         if edit {
             self.set_editable(tour_id.clone(), true);
+            self.refresh_tour(tour_id, None)?;
         } else {
             self.set_editable(tour_id, false);
         }
