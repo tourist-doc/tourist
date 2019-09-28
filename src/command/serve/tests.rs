@@ -226,9 +226,9 @@ fn set_tour_edit_test() {
         },
     );
     tourist.set_tour_edit("TOURID".to_owned(), true).unwrap();
-    assert!(tourist.get_edits().contains("TOURID"));
+    assert!(tourist.is_editable("TOURID"));
     tourist.set_tour_edit("TOURID".to_owned(), false).unwrap();
-    assert!(!tourist.get_edits().contains("TOURID"));
+    assert!(!tourist.is_editable("TOURID"));
 }
 
 #[test]
@@ -268,7 +268,7 @@ fn view_tour_test() {
             edit: false,
         }
     );
-    tourist.get_edits_mut().insert("TOURID".to_owned());
+    tourist.set_editable("TOURID".to_owned(), true);
     assert!(tourist.view_tour("TOURID".to_owned()).unwrap().edit);
 }
 
@@ -287,6 +287,7 @@ fn edit_tour_metadata_test() {
             repositories: vec![].into_iter().collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
 
     tourist
         .edit_tour_metadata(
@@ -371,6 +372,7 @@ fn create_stop_test() {
             repositories: vec![].into_iter().collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
     let id = tourist
         .create_stop(
             "TOURID".to_owned(),
@@ -456,6 +458,7 @@ fn edit_stop_metadata_test() {
                 .collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
     {
         tourist
             .edit_stop_metadata(
@@ -521,6 +524,7 @@ fn move_stop_test() {
                 .collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
 
     tourist
         .move_stop(
@@ -588,6 +592,7 @@ fn reorder_stop_test() {
                 .collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
 
     {
         tourist
@@ -661,6 +666,7 @@ fn link_stop_test() {
                 .collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
     {
         tourist
             .link_stop(
@@ -729,6 +735,7 @@ fn unlink_stop_test() {
                 .collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
     {
         tourist
             .unlink_stop(
@@ -840,6 +847,8 @@ fn remove_stop_test() {
                 .collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
+
     tourist
         .remove_stop("TOURID".to_owned(), "STOPID".to_owned())
         .unwrap();
@@ -878,6 +887,7 @@ fn refresh_tour_test() {
                 .collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
 
     let mut changes = Changes::new();
     changes.0.insert(
@@ -928,6 +938,7 @@ fn save_tour_test() {
                 .collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
 
     let path = PathBuf::from("/foo/bar");
 
@@ -965,6 +976,7 @@ fn save_all_test() {
                 .collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
 
     manager
         .path_map
@@ -1004,6 +1016,7 @@ fn delete_tour_test() {
                 .collect(),
         },
     );
+    tourist.set_editable("TOURID".to_owned(), true);
 
     let path = PathBuf::from("/foo/bar");
 

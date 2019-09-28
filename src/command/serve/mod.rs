@@ -151,16 +151,19 @@ impl<M: TourFileManager, V: VCS, I: Index> Tourist<M, V, I> {
         })
     }
 
-    /// Get a reference to the current set of editable tours. In the event of a `PoisonError`, we
-    /// panic.
-    fn get_edits(&self) -> RwLockReadGuard<HashSet<TourId>> {
-        self.edits.read().unwrap()
+    /// Determines if a particular tour is editable. In the event of a `PoisonError`, we panic.
+    fn is_editable(&self, tour_id: &str) -> bool {
+        self.edits.read().unwrap().contains(tour_id)
     }
 
-    /// Get a mutable reference to the current set of editable tours. In the event of a
-    /// `PoisonError`, we panic.
-    fn get_edits_mut(&self) -> RwLockWriteGuard<HashSet<TourId>> {
-        self.edits.write().unwrap()
+    /// Sets whether or not a particular tour is editable. In the event of a `PoisonError`, we
+    /// panic.
+    fn set_editable(&self, tour_id: TourId, edit: bool) {
+        if edit {
+            self.edits.write().unwrap().insert(tour_id);
+        } else {
+            self.edits.write().unwrap().remove(&tour_id);
+        }
     }
 
     fn view_stop_reference(&self, sr: &StopReference) -> Result<StopReferenceView> {
@@ -220,27 +223,28 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         Ok(id)
     }
 
-    fn open_tour(&self, path: PathBuf, _edit: bool) -> JsonResult<TourId> {
+    fn open_tour(&self, path: PathBuf, edit: bool) -> JsonResult<TourId> {
         let tour = self.manager.load_tour(path).as_json_result()?;
         let mut tours = self.get_tours_mut();
         let id = tour.id.clone();
         tours.insert(tour.id.clone(), tour);
+        if edit {
+            self.set_editable(id.clone(), true);
+        }
         Ok(id)
     }
 
     fn set_tour_edit(&self, tour_id: TourId, edit: bool) -> JsonResult<()> {
-        let mut edits = self.get_edits_mut();
         if edit {
-            edits.insert(tour_id);
+            self.set_editable(tour_id.clone(), true);
         } else {
-            edits.remove(&tour_id);
+            self.set_editable(tour_id, false);
         }
         Ok(())
     }
 
     fn view_tour(&self, tour_id: TourId) -> JsonResult<TourView> {
         self.with_tour(&tour_id, |tour| {
-            let edits = self.get_edits();
             Ok(TourView {
                 title: tour.title.clone(),
                 description: tour.description.clone(),
@@ -254,13 +258,16 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
                     .iter()
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .collect(),
-                edit: edits.contains(&tour_id),
+                edit: self.is_editable(&tour_id),
             })
         })
         .as_json_result()
     }
 
     fn edit_tour_metadata(&self, tour_id: TourId, delta: TourMetadata) -> JsonResult<()> {
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
         self.with_tour_mut(&tour_id, |tour| {
             delta.apply_to(tour);
             Ok(())
@@ -269,6 +276,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     }
 
     fn refresh_tour(&self, tour_id: TourId, commit: Option<String>) -> JsonResult<()> {
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
         self.with_tour_mut(&tour_id, |tour| {
             let mut new_versions = HashMap::new();
             for mut stop in tour.stops.iter_mut() {
@@ -321,6 +331,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         path: PathBuf,
         line: usize,
     ) -> JsonResult<StopId> {
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
         let id = format!("{}", Uuid::new_v4().to_simple());
         let (rel_path, repo, repo_path) =
             find_path_in_context(&self.index, path).as_json_result()?;
@@ -372,6 +385,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         stop_id: StopId,
         delta: StopMetadata,
     ) -> JsonResult<()> {
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
         self.with_stop_mut(&tour_id, &stop_id, |stop| {
             delta.apply_to(stop);
             Ok(())
@@ -386,6 +402,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         path: PathBuf,
         line: usize,
     ) -> JsonResult<()> {
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
         let (rel_path, repo, repo_path) =
             find_path_in_context(&self.index, path).as_json_result()?;
         // Two things need to happen here:
@@ -432,6 +451,10 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
             cmp::min(cmp::max(val, min), max)
         }
 
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
+
         self.with_tour_mut(&tour_id, |tour| {
             let idx = tour
                 .stops
@@ -460,6 +483,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         other_tour_id: TourId,
         other_stop_id: Option<StopId>,
     ) -> JsonResult<()> {
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
         self.with_stop_mut(&tour_id, &stop_id, |stop| {
             stop.children.push(StopReference {
                 tour_id: other_tour_id,
@@ -477,6 +503,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         other_tour_id: TourId,
         other_stop_id: Option<StopId>,
     ) -> JsonResult<()> {
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
         self.with_stop_mut(&tour_id, &stop_id, |stop| {
             stop.children
                 .retain(|r| !(r.tour_id == other_tour_id && r.stop_id == other_stop_id));
@@ -522,6 +551,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     }
 
     fn remove_stop(&self, tour_id: TourId, stop_id: StopId) -> JsonResult<()> {
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
         self.with_tour_mut(&tour_id, |tour| {
             let n = tour.stops.len();
             tour.stops.retain(|stop| stop.id != stop_id);
@@ -550,12 +582,17 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
 
     fn save_all(&self) -> JsonResult<()> {
         for tour in self.get_tours().values() {
-            self.manager.save_tour(tour.id.clone()).as_json_result()?;
+            if self.is_editable(&tour.id) {
+                self.manager.save_tour(tour.id.clone()).as_json_result()?;
+            }
         }
         Ok(())
     }
 
     fn save_tour(&self, tour_id: TourId, path: Option<PathBuf>) -> JsonResult<()> {
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
         if let Some(path) = path {
             self.manager.set_tour_path(tour_id.clone(), path);
         }
@@ -564,6 +601,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     }
 
     fn delete_tour(&self, tour_id: TourId) -> JsonResult<()> {
+        if !self.is_editable(&tour_id) {
+            return Err(ErrorKind::TourNotEditable).as_json_result();
+        }
         self.forget_tour(tour_id.clone())?;
         self.manager.delete_tour(tour_id).as_json_result()?;
         Ok(())

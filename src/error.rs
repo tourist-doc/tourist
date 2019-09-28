@@ -71,6 +71,8 @@ pub enum ErrorKind {
     EncodingFailure,
     #[fail(display = "something went wrong while creating zip file")]
     ZipFailure,
+    #[fail(display = "please open tour as editable to make changes")]
+    TourNotEditable,
     #[fail(display = "unknown error")]
     UnknownFailure,
 }
