@@ -45,15 +45,10 @@ impl TourMetadata {
     }
 }
 
-fn resolve_path<I: Index>(
-    index: &I,
-    repository: &str,
-    rel_path: &RelativePathBuf,
-) -> Result<AbsolutePathBuf> {
-    let abs = index
+fn resolve_path<I: Index>(index: &I, repository: &str) -> Result<AbsolutePathBuf> {
+    index
         .get(repository)?
-        .ok_or_else(|| ErrorKind::RepositoryNotInIndex.attach("Repository", repository))?;
-    Ok(abs.join_rel(rel_path))
+        .ok_or_else(|| ErrorKind::RepositoryNotInIndex.attach("Repository", repository))
 }
 
 fn find_path_in_context<I: Index>(
@@ -284,16 +279,14 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         self.with_tour_mut(&tour_id, |tour| {
             let mut new_versions = HashMap::new();
             for mut stop in tour.stops.iter_mut() {
-                let repo_path = resolve_path(&self.index, &stop.repository, &stop.path)?;
+                let repo_path = resolve_path(&self.index, &stop.repository)?;
                 let tour_version = tour.repositories.get(&stop.repository).ok_or_else(|| {
                     ErrorKind::NoVersionForRepository.attach("Repository", stop.repository.clone())
                 })?;
                 let target_version = if let Some(commit) = commit.clone() {
                     commit
                 } else {
-                    self.vcs
-                        .get_current_version(repo_path.as_absolute_path())
-                        .context(ErrorKind::DiffFailed)?
+                    self.vcs.get_current_version(repo_path.as_absolute_path())?
                 };
                 let changes = self
                     .vcs
@@ -359,7 +352,6 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
             repo,
             self.vcs
                 .get_current_version(repo_path.as_absolute_path())
-                .context(ErrorKind::DiffFailed)
                 .as_json_result()?,
         );
         Ok(id)
@@ -425,9 +417,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
             // Then, make the change to tour.repositories
             tour.repositories.insert(
                 repo,
-                self.vcs
-                    .get_current_version(repo_path.as_absolute_path())
-                    .context(ErrorKind::DiffFailed)?,
+                self.vcs.get_current_version(repo_path.as_absolute_path())?,
             );
             Ok(())
         })
@@ -528,7 +518,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
                     // broken stop, can't locate
                     return Ok(None);
                 }
-                let path = resolve_path(&self.index, &stop.repository, &stop.path)?;
+                let path = resolve_path(&self.index, &stop.repository)?;
                 let line = if naive {
                     Some(stop.line)
                 } else {
@@ -546,7 +536,7 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
                         Some(stop.line)
                     }
                 };
-                Ok(line.map(|l| (path.as_path_buf().clone(), l)))
+                Ok(line.map(|l| (path.join_rel(&stop.path).as_path_buf().clone(), l)))
             })
         })
         .as_json_result()
