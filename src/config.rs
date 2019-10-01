@@ -55,12 +55,12 @@ pub struct Config {
     pub dirs: Vec<AbsolutePathBuf>,
 }
 
-pub fn get_default_tours() -> Result<Vec<Tour>> {
+pub fn get_default_tours() -> Result<Vec<(Tour, PathBuf)>> {
     let config: Config = config();
     collect_tours(config.dirs.clone())
 }
 
-fn collect_tours(mut stack: Vec<AbsolutePathBuf>) -> Result<Vec<Tour>> {
+fn collect_tours(mut stack: Vec<AbsolutePathBuf>) -> Result<Vec<(Tour, PathBuf)>> {
     let mut tours = vec![];
     while let Some(dir) = stack.pop() {
         let entries = dir
@@ -76,10 +76,10 @@ fn collect_tours(mut stack: Vec<AbsolutePathBuf>) -> Result<Vec<Tour>> {
                 );
             } else if path.extension().and_then(OsStr::to_str) == Some("tour") {
                 let tour = serialize::parse_tour(
-                    &fs::read_to_string(path).context(ErrorKind::FailedToReadTour)?,
+                    &fs::read_to_string(&path).context(ErrorKind::FailedToReadTour)?,
                 )
                 .context(ErrorKind::FailedToParseTour)?;
-                tours.push(tour);
+                tours.push((tour, path));
             }
         }
     }
@@ -121,11 +121,15 @@ mod tests {
     fn collect_tours_works() {
         let temp_dir = TempDir::new("collect_tours_works").unwrap();
         write_basic_tour(&temp_dir.path().join("example.tour"));
-        let tours =
-            collect_tours(vec![AbsolutePathBuf::new(temp_dir.into_path()).unwrap()]).unwrap();
-        assert_eq!(tours[0].generator, 0);
-        assert_eq!(tours[0].title, "My first tour");
-        assert_eq!(tours[0].stops.len(), 0);
+        let tours = collect_tours(vec![
+            AbsolutePathBuf::new(temp_dir.path().to_path_buf()).unwrap()
+        ])
+        .unwrap();
+        assert_eq!(tours[0].0.generator, 0);
+        assert_eq!(tours[0].0.title, "My first tour");
+        assert_eq!(tours[0].0.stops.len(), 0);
+
+        assert_eq!(tours[0].1, temp_dir.path().join("example.tour"));
     }
 
     #[test]

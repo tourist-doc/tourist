@@ -612,16 +612,21 @@ impl<V: VCS, I: Index> Serve<V, I> {
         Serve { vcs, index }
     }
 
-    pub fn process(&self, init_tours: Vec<Tour>) {
+    pub fn process(&self, init_tours: Vec<(Tour, PathBuf)>) {
         info!("running server with initial tours {:?}", init_tours);
         let mut io = jsonrpc_core::IoHandler::new();
+        let path_map = init_tours
+            .iter()
+            .map(|(tour, path)| (tour.id.clone(), path.clone()))
+            .collect::<HashMap<_, _>>();
         let tours = Arc::new(RwLock::new(
             init_tours
                 .into_iter()
-                .map(|tour| (tour.id.clone(), tour))
+                .map(|(tour, _)| (tour.id.clone(), tour))
                 .collect(),
         ));
-        let manager = AsyncTourFileManager::new(Arc::clone(&tours));
+        let manager =
+            AsyncTourFileManager::new(Arc::clone(&tours), Arc::new(RwLock::new(path_map)));
         manager.start();
         io.extend_with(
             Tourist {

@@ -22,11 +22,8 @@ pub struct AsyncTourFileManager {
 }
 
 impl AsyncTourFileManager {
-    pub fn new(tours: Arc<RwLock<Tracker>>) -> Self {
-        AsyncTourFileManager {
-            tours,
-            paths: Arc::new(RwLock::new(HashMap::new())),
-        }
+    pub fn new(tours: Arc<RwLock<Tracker>>, paths: Arc<RwLock<HashMap<TourId, PathBuf>>>) -> Self {
+        AsyncTourFileManager { tours, paths }
     }
 
     pub fn start(&self) {
