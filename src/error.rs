@@ -1,5 +1,6 @@
 use failure::{Backtrace, Context, Fail};
 use jsonrpc_core::Result as JsonResult;
+use slog_scope::error;
 use std::fmt;
 use std::fmt::Display;
 
@@ -12,6 +13,7 @@ pub trait AsJsonResult<T> {
 impl<T, F: Fail> AsJsonResult<T> for std::result::Result<T, F> {
     fn as_json_result(self) -> JsonResult<T> {
         self.or_else(|e| {
+            error!("JSON Result Error: {}", e);
             let mut err = jsonrpc_core::Error::internal_error();
             err.data = Some(format!("{}", e).into());
             Err(err)

@@ -7,7 +7,7 @@ use failure::ResultExt;
 use jsonrpc_core;
 use jsonrpc_core::Result as JsonResult;
 use jsonrpc_stdio_server::ServerBuilder;
-use slog_scope::info;
+use slog_scope::{info, warn};
 use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -293,13 +293,11 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
                     .diff_with_version(repo_path.as_absolute_path(), &tour_version, &target_version)
                     .context(ErrorKind::DiffFailed)?;
                 if let Some(file_changes) = changes.for_file(&stop.path) {
-                    match file_changes.adjust_line(stop.line) {
-                        Some(line) => {
-                            stop.line = line;
-                        }
-                        None => {
-                            stop.broken = Some("line was deleted".to_owned());
-                        }
+                    if let Some(line) = file_changes.adjust_line(stop.line) {
+                        stop.line = line;
+                    } else {
+                        warn!("stop broke\nchanges:\n{:?}\n", file_changes);
+                        stop.broken = Some("line was deleted".to_owned());
                     }
                 }
                 new_versions.insert(stop.repository.clone(), target_version.clone());
@@ -514,14 +512,14 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     ) -> JsonResult<Option<(PathBuf, usize)>> {
         self.with_tour(&tour_id, |tour| {
             self.with_stop(&tour_id, &stop_id, |stop| {
-                if stop.broken.is_some() {
-                    // broken stop, can't locate
-                    return Ok(None);
-                }
                 let path = resolve_path(&self.index, &stop.repository)?;
                 let line = if naive {
                     Some(stop.line)
                 } else {
+                    if stop.broken.is_some() {
+                        // broken stop, can't locate
+                        return Ok(None);
+                    }
                     let version = tour.repositories.get(&stop.repository).ok_or_else(|| {
                         ErrorKind::NoVersionForRepository
                             .attach("Repository", stop.repository.clone())
@@ -531,7 +529,11 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
                         .diff_with_worktree(path.as_absolute_path(), version)
                         .context(ErrorKind::DiffFailed)?;
                     if let Some(changes) = changes.for_file(&stop.path) {
-                        changes.adjust_line(stop.line)
+                        let adj = changes.adjust_line(stop.line);
+                        if adj.is_none() {
+                            warn!("locate determined stop is broken. changes:\n{:?}", changes);
+                        }
+                        adj
                     } else {
                         Some(stop.line)
                     }
