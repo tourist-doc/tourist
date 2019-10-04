@@ -53,9 +53,9 @@ impl<V: VCS, I: Index> Dump<V, I> {
                 above,
                 below,
             } => {
-                let repo_path = index
-                    .get(&stop.repository)?
-                    .ok_or(ErrorKind::RepositoryNotInIndex)?;
+                let repo_path = index.get(&stop.repository)?.ok_or_else(|| {
+                    ErrorKind::RepositoryNotInIndex.attach("Repository", stop.repository.clone())
+                })?;
 
                 let content = code_range(
                     vcs.lookup_file_contents(repo_path.as_absolute_path(), commit, &stop.path)?,

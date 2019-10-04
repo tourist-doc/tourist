@@ -10,14 +10,56 @@ pub trait AsJsonResult<T> {
     fn as_json_result(self) -> JsonResult<T>;
 }
 
-impl<T, F: Fail> AsJsonResult<T> for std::result::Result<T, F> {
+impl<T> AsJsonResult<T> for std::result::Result<T, Error> {
     fn as_json_result(self) -> JsonResult<T> {
         self.or_else(|e| {
             error!("JSON Result Error: {}", e);
             let mut err = jsonrpc_core::Error::internal_error();
             err.data = Some(format!("{}", e).into());
+            err.code = jsonrpc_core::ErrorCode::ServerError(error_code(e.inner.get_context()));
             Err(err)
         })
+    }
+}
+
+pub fn error_code(kind: &ErrorKind) -> i64 {
+    use ErrorKind::*;
+    match kind {
+        // Recoverable
+        NoRepositoryForFile => 300,
+        RepositoryNotInIndex => 301,
+        TourNotEditable => 310,
+        NoPathForTour => 320,
+
+        // Input Errors
+        NoTourWithID => 400,
+        NoStopWithID => 401,
+
+        // Config Errors
+        InvalidRepositoryPath => 410,
+        ExpectedAbsolutePath => 411,
+
+        // Tour File Inconsistencies
+        InvalidCommitHash => 420,
+        NoVersionForRepository => 421,
+
+        // IO Errors
+        FailedToReadTour => 500,
+        FailedToWriteTour => 501,
+        FailedToReadIndex => 510,
+        FailedToWriteIndex => 511,
+        FailedToWriteZip => 520,
+        FailedToSerializeTour => 530,
+        FailedToSerializeIndex => 531,
+        FailedToParseTour => 541,
+        FailedToParseRevision => 542,
+        FailedToParseIndex => 543,
+
+        // Anomalies
+        EncodingFailure => 600,
+        ZipFailure => 601,
+        PositionDeltaOutOfRange => 602,
+        DiffFailed => 603,
     }
 }
 
@@ -30,21 +72,21 @@ pub struct Error {
 #[derive(Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
     #[fail(display = "could not find the specified tour")]
-    NoTourFound,
+    NoTourWithID,
     #[fail(display = "could not find the specified stop")]
-    NoStopFound,
-    #[fail(display = "could not find the specified git repository")]
-    NoRepositoryFound,
-    #[fail(display = "could not find the specified git commit")]
-    NoCommitFound,
+    NoStopWithID,
+    #[fail(display = "no git repository exists at the provided path")]
+    InvalidRepositoryPath,
+    #[fail(display = "internal error: git failed to process commit")]
+    InvalidCommitHash,
     #[fail(display = "tour has not been saved and does not have a path")]
     NoPathForTour,
     #[fail(display = "no version for repsoitory")]
     NoVersionForRepository,
     #[fail(display = "the provided path was not absolute")]
     ExpectedAbsolutePath,
-    #[fail(display = "path does not appear to be in a Git repository")]
-    PathNotInIndex,
+    #[fail(display = "file path is not in an indexed git repository")]
+    NoRepositoryForFile,
     #[fail(display = "repsoitory does not appear to be mapped to a git repository")]
     RepositoryNotInIndex,
     #[fail(display = "could not read the provided tour file")]
@@ -75,8 +117,8 @@ pub enum ErrorKind {
     ZipFailure,
     #[fail(display = "please open tour as editable to make changes")]
     TourNotEditable,
-    #[fail(display = "unknown error")]
-    UnknownFailure,
+    #[fail(display = "position delta was not in the appropriate range")]
+    PositionDeltaOutOfRange,
 }
 
 impl Error {

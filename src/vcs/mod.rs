@@ -1,4 +1,4 @@
-use crate::error::{ErrorKind, Result};
+use crate::error::{Error, ErrorKind, Result};
 use crate::types::path::{AbsolutePath, RelativePathBuf};
 use failure::ResultExt;
 use git2::{DiffOptions, Oid, Repository};
@@ -45,11 +45,16 @@ pub struct Git;
 
 impl Git {
     fn diff(&self, repo_path: AbsolutePath<'_>, from: &str, to: Option<&str>) -> Result<Changes> {
-        let repo = Repository::open(repo_path.as_path()).context(ErrorKind::NoRepositoryFound)?;
+        let repo = Repository::open(repo_path.as_path())
+            .context(ErrorKind::InvalidRepositoryPath)
+            .or_else(|e| {
+                Err(Error::from(e)
+                    .attach("repo_path", format!("{}", repo_path.as_path().display())))
+            })?;
 
         let from_tree = Oid::from_str(from)
             .and_then(|oid| repo.find_commit(oid)?.tree())
-            .context(ErrorKind::NoCommitFound)?;
+            .context(ErrorKind::InvalidCommitHash)?;
         let mut opts = DiffOptions::new();
         opts.minimal(true);
         opts.ignore_whitespace_eol(true);
@@ -57,7 +62,7 @@ impl Git {
         let diff = if let Some(to) = to {
             let to_tree = Oid::from_str(to)
                 .and_then(|oid| repo.find_commit(oid)?.tree())
-                .context(ErrorKind::NoCommitFound)?;
+                .context(ErrorKind::InvalidCommitHash)?;
             repo.diff_tree_to_tree(Some(&from_tree), Some(&to_tree), Some(&mut opts))
                 .context(ErrorKind::DiffFailed)?
         } else {
@@ -104,11 +109,16 @@ impl Git {
 
 impl VCS for Git {
     fn get_current_version(&self, repo_path: AbsolutePath<'_>) -> Result<String> {
-        let repo = Repository::open(repo_path.as_path()).context(ErrorKind::NoRepositoryFound)?;
+        let repo = Repository::open(repo_path.as_path())
+            .context(ErrorKind::InvalidRepositoryPath)
+            .or_else(|e| {
+                Err(Error::from(e)
+                    .attach("repo_path", format!("{}", repo_path.as_path().display())))
+            })?;
         let id = repo
             .head()
             .and_then(|head| Ok(head.peel_to_commit()?.id()))
-            .context(ErrorKind::NoCommitFound)?;
+            .context(ErrorKind::InvalidCommitHash)?;
         Ok(format!("{}", id))
     }
 
@@ -118,7 +128,12 @@ impl VCS for Git {
         commit: &str,
         file_path: &RelativePathBuf,
     ) -> Result<Vec<u8>> {
-        let repo = Repository::open(repo_path.as_path()).context(ErrorKind::NoRepositoryFound)?;
+        let repo = Repository::open(repo_path.as_path())
+            .context(ErrorKind::InvalidRepositoryPath)
+            .or_else(|e| {
+                Err(Error::from(e)
+                    .attach("repo_path", format!("{}", repo_path.as_path().display())))
+            })?;
         let rev = format!("{}:{}", commit, file_path.as_git_path());
         let obj = repo
             .revparse_single(&rev)

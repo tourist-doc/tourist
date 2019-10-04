@@ -34,7 +34,9 @@ impl<V: VCS, I: Index> Package<V, I> {
             let content = self.vcs.lookup_file_bytes(
                 self.index
                     .get(&repository)?
-                    .ok_or(ErrorKind::RepositoryNotInIndex)?
+                    .ok_or_else(|| {
+                        ErrorKind::RepositoryNotInIndex.attach("Repsoitory", repository.clone())
+                    })?
                     .as_absolute_path(),
                 tour.repositories
                     .get(&repository)
