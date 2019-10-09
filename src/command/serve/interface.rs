@@ -122,6 +122,10 @@ pub trait TouristRpc {
     #[rpc(name = "forget_tour")]
     fn forget_tour(&self, tour_id: TourId) -> JsonResult<()>;
 
+    /// Reset any edits made to a tour from its backing file.
+    #[rpc(name = "reset_tour")]
+    fn reload_tour(&self, tour_id: TourId) -> JsonResult<()>;
+
     /// Create a new stop in the given tour. Returns the ID of the new stop.
     #[rpc(name = "create_stop")]
     fn create_stop(

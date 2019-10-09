@@ -235,7 +235,8 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
             self.set_editable(tour_id.clone(), true);
             self.refresh_tour(tour_id, None)?;
         } else {
-            self.set_editable(tour_id, false);
+            self.set_editable(tour_id.clone(), false);
+            self.reload_tour(tour_id)?;
         }
         Ok(())
     }
@@ -315,6 +316,12 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
             return Err(ErrorKind::NoTourWithID.attach("ID", tour_id)).as_json_result();
         }
         tours.remove(&tour_id);
+        Ok(())
+    }
+
+    fn reload_tour(&self, tour_id: TourId) -> JsonResult<()> {
+        let tour = self.manager.reload_tour(tour_id.clone()).as_json_result()?;
+        self.tours.write().unwrap().insert(tour_id, tour);
         Ok(())
     }
 

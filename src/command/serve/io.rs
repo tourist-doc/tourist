@@ -14,6 +14,7 @@ pub trait TourFileManager: Send + Sync + 'static {
     fn load_tour(&self, path: PathBuf) -> Result<Tour>;
     fn delete_tour(&self, tour_id: TourId) -> Result<()>;
     fn set_tour_path(&self, tour_id: TourId, path: PathBuf);
+    fn reload_tour(&self, tour_id: TourId) -> Result<Tour>;
 }
 
 pub struct AsyncTourFileManager {
@@ -66,6 +67,14 @@ impl TourFileManager for AsyncTourFileManager {
         tours.remove(&tour_id);
         paths.remove(&tour_id);
         Ok(())
+    }
+
+    fn reload_tour(&self, tour_id: TourId) -> Result<Tour> {
+        let paths = self.paths.read().unwrap();
+        let path = paths
+            .get(&tour_id)
+            .ok_or_else(|| ErrorKind::NoPathForTour.attach("TourId", tour_id.clone()))?;
+        self.load_tour(path.to_path_buf())
     }
 
     fn set_tour_path(&self, tour_id: TourId, path: PathBuf) {

@@ -57,6 +57,12 @@ impl TourFileManager for MockTourFileManager {
         let mut paths = self.path_map.write().unwrap();
         paths.insert(tour_id, path);
     }
+
+    fn reload_tour(&self, tour_id: TourId) -> Result<Tour> {
+        let path_map = self.path_map.read().unwrap();
+        let path = path_map.get(&tour_id).unwrap();
+        Ok(self.file_system.read().unwrap().get(path).unwrap().clone())
+    }
 }
 
 #[derive(Clone)]
@@ -212,19 +218,31 @@ fn open_tour_test() {
 
 #[test]
 fn set_tour_edit_test() {
-    let (tourist, _, _) = test_instance();
-    tourist.get_tours_mut().insert(
-        "TOURID".to_owned(),
-        Tour {
-            generator: 0,
-            id: "TOURID".to_owned(),
-            title: "My first tour".to_owned(),
-            description: "".to_owned(),
-            stops: vec![],
-            protocol_version: "1.0".to_owned(),
-            repositories: vec![].into_iter().collect(),
-        },
-    );
+    let (tourist, manager, _) = test_instance();
+    let tour = Tour {
+        generator: 0,
+        id: "TOURID".to_owned(),
+        title: "My first tour".to_owned(),
+        description: "".to_owned(),
+        stops: vec![],
+        protocol_version: "1.0".to_owned(),
+        repositories: vec![].into_iter().collect(),
+    };
+    tourist
+        .get_tours_mut()
+        .insert("TOURID".to_owned(), tour.clone());
+
+    manager
+        .path_map
+        .write()
+        .unwrap()
+        .insert("TOURID".to_owned(), PathBuf::from("/foo/bar"));
+    manager
+        .file_system
+        .write()
+        .unwrap()
+        .insert(PathBuf::from("/foo/bar"), tour);
+
     tourist.set_tour_edit("TOURID".to_owned(), true).unwrap();
     assert!(tourist.is_editable("TOURID"));
     tourist.set_tour_edit("TOURID".to_owned(), false).unwrap();
@@ -351,6 +369,51 @@ fn forget_tour_test() {
     );
     tourist.forget_tour("TOURID".to_owned()).unwrap();
     assert!(tourist.get_tours().is_empty());
+}
+
+#[test]
+fn reload_tour_test() {
+    let (tourist, manager, _) = test_instance();
+    let tour = Tour {
+        generator: 0,
+        id: "TOURID".to_owned(),
+        title: "My first tour".to_owned(),
+        description: "".to_owned(),
+        stops: vec![],
+        protocol_version: "1.0".to_owned(),
+        repositories: vec![].into_iter().collect(),
+    };
+    tourist
+        .get_tours_mut()
+        .insert("TOURID".to_owned(), tour.clone());
+
+    manager
+        .path_map
+        .write()
+        .unwrap()
+        .insert("TOURID".to_owned(), PathBuf::from("/foo/bar"));
+    manager
+        .file_system
+        .write()
+        .unwrap()
+        .insert(PathBuf::from("/foo/bar"), tour);
+
+    tourist.set_editable("TOURID".to_owned(), true);
+    tourist
+        .edit_tour_metadata(
+            "TOURID".to_owned(),
+            TourMetadata {
+                title: Some("Different name".to_owned()),
+                description: None,
+            },
+        )
+        .unwrap();
+    tourist.reload_tour("TOURID".to_owned()).unwrap();
+
+    assert_eq!(
+        tourist.get_tours().get("TOURID").unwrap().title,
+        "My first tour"
+    );
 }
 
 #[test]
