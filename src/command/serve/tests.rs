@@ -217,7 +217,7 @@ fn open_tour_test() {
 }
 
 #[test]
-fn set_tour_edit_test() {
+fn freeze_unfreeze_tour_test() {
     let (tourist, manager, _) = test_instance();
     let tour = Tour {
         generator: 0,
@@ -243,9 +243,9 @@ fn set_tour_edit_test() {
         .unwrap()
         .insert(PathBuf::from("/foo/bar"), tour);
 
-    tourist.set_tour_edit("TOURID".to_owned(), true).unwrap();
+    tourist.unfreeze_tour("TOURID".to_owned()).unwrap();
     assert!(tourist.is_editable("TOURID"));
-    tourist.set_tour_edit("TOURID".to_owned(), false).unwrap();
+    tourist.freeze_tour("TOURID".to_owned()).unwrap();
     assert!(!tourist.is_editable("TOURID"));
 }
 

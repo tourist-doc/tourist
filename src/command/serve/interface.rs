@@ -104,9 +104,13 @@ pub trait TouristRpc {
     #[rpc(name = "open_tour")]
     fn open_tour(&self, path: PathBuf, edit: bool) -> JsonResult<TourId>;
 
-    /// Set whether or not a tour is in edit mode.
-    #[rpc(name = "set_tour_edit")]
-    fn set_tour_edit(&self, tour_id: TourId, edit: bool) -> JsonResult<()>;
+    /// Sets a tour as uneditable.
+    #[rpc(name = "freeze_tour")]
+    fn freeze_tour(&self, tour_id: TourId) -> JsonResult<()>;
+
+    /// Sets a tour as editable.
+    #[rpc(name = "unfreeze_tour")]
+    fn unfreeze_tour(&self, tour_id: TourId) -> JsonResult<()>;
 
     /// View all of the top-level data for a tour.
     #[rpc(name = "view_tour")]

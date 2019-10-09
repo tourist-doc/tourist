@@ -230,14 +230,15 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         Ok(id)
     }
 
-    fn set_tour_edit(&self, tour_id: TourId, edit: bool) -> JsonResult<()> {
-        if edit {
-            self.set_editable(tour_id.clone(), true);
-            self.refresh_tour(tour_id, None)?;
-        } else {
-            self.set_editable(tour_id.clone(), false);
-            self.reload_tour(tour_id)?;
-        }
+    fn freeze_tour(&self, tour_id: TourId) -> JsonResult<()> {
+        self.set_editable(tour_id.clone(), false);
+        self.reload_tour(tour_id)?;
+        Ok(())
+    }
+
+    fn unfreeze_tour(&self, tour_id: TourId) -> JsonResult<()> {
+        self.set_editable(tour_id.clone(), true);
+        self.refresh_tour(tour_id, None)?;
         Ok(())
     }
 
