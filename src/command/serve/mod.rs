@@ -587,12 +587,19 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
             tour.stops.retain(|stop| stop.id != stop_id);
             if n == tour.stops.len() {
                 // No change in length means that the stop was not deleted successfully
-                Err(ErrorKind::NoStopWithID
+                return Err(ErrorKind::NoStopWithID
                     .attach("Tour ID", tour_id.clone())
-                    .attach("Stop ID", stop_id.clone()))
-            } else {
-                Ok(())
+                    .attach("Stop ID", stop_id.clone()));
             }
+            // Remove any unncessary repos
+            let used_repos = tour
+                .stops
+                .iter()
+                .map(|s| s.repository.clone())
+                .collect::<HashSet<_>>();
+            tour.repositories
+                .retain(|repo, _| used_repos.contains(repo));
+            Ok(())
         })
         .as_json_result()
     }
