@@ -20,6 +20,8 @@ pub trait VCS: Send + Sync + 'static + Clone {
 
     fn diff_with_worktree(&self, repo_path: AbsolutePath<'_>, from: &str) -> Result<Changes>;
 
+    fn is_workspace_dirty(&self, repo_path: AbsolutePath<'_>) -> Result<bool>;
+
     fn lookup_file_bytes(
         &self,
         repo_path: AbsolutePath<'_>,
@@ -140,6 +142,11 @@ impl VCS for Git {
             .context(ErrorKind::FailedToParseRevision)?;
         let blob = obj.as_blob().ok_or(ErrorKind::FailedToParseRevision)?;
         Ok(blob.content().to_vec())
+    }
+
+    fn is_workspace_dirty(&self, repo_path: AbsolutePath<'_>) -> Result<bool> {
+        let changes = self.diff(repo_path, "HEAD", None)?;
+        Ok(!changes.is_empty())
     }
 
     fn diff_with_version(

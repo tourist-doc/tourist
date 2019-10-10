@@ -192,6 +192,26 @@ impl<M: TourFileManager, V: VCS, I: Index> Tourist<M, V, I> {
             })
         }
     }
+
+    fn is_up_to_date(&self, tour_id: &str) -> Result<bool> {
+        let repo_up_to_date = |(repo_name, tour_v): (&String, &String)| -> Result<bool> {
+            let path = self
+                .index
+                .get(repo_name)?
+                .ok_or_else(|| ErrorKind::RepositoryNotInIndex.attach("repo", repo_name))?;
+            let curr_v = self.vcs.get_current_version(path.as_absolute_path())?;
+            Ok(tour_v == &curr_v && !self.vcs.is_workspace_dirty(path.as_absolute_path())?)
+        };
+
+        self.with_tour(&tour_id, |tour| {
+            let eqs = tour
+                .repositories
+                .iter()
+                .map(repo_up_to_date)
+                .collect::<Result<Vec<_>>>()?;
+            Ok(eqs.into_iter().all(|x| x))
+        })
+    }
 }
 
 impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
@@ -336,6 +356,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into()).as_json_result();
         }
+        if !self.is_up_to_date(&tour_id).as_json_result()? {
+            return Err(ErrorKind::TourNotUpToDate.into()).as_json_result();
+        }
         let id = format!("{}", Uuid::new_v4().to_simple());
         let (rel_path, repo, repo_path) =
             find_path_in_context(&self.index, path).as_json_result()?;
@@ -405,6 +428,9 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Tourist<M, V, I> {
     ) -> JsonResult<()> {
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into()).as_json_result();
+        }
+        if !self.is_up_to_date(&tour_id).as_json_result()? {
+            return Err(ErrorKind::TourNotUpToDate.into()).as_json_result();
         }
         let (rel_path, repo, repo_path) =
             find_path_in_context(&self.index, path).as_json_result()?;

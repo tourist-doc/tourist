@@ -84,6 +84,10 @@ impl VCS for MockVCS {
         Ok(self.last_changes.clone().unwrap())
     }
 
+    fn is_workspace_dirty(&self, _repo_path: AbsolutePath<'_>) -> error::Result<bool> {
+        Ok(false)
+    }
+
     fn diff_with_worktree(
         &self,
         _repo_path: AbsolutePath<'_>,

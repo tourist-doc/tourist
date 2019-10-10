@@ -29,6 +29,7 @@ pub fn error_code(kind: &ErrorKind) -> i64 {
         NoRepositoryForFile => 300,
         RepositoryNotInIndex => 301,
         TourNotEditable => 310,
+        TourNotUpToDate => 311,
         NoPathForTour => 320,
 
         // Input Errors
@@ -117,6 +118,8 @@ pub enum ErrorKind {
     ZipFailure,
     #[fail(display = "please open tour as editable to make changes")]
     TourNotEditable,
+    #[fail(display = "please stash your local changes and check out correct tour versions")]
+    TourNotUpToDate,
     #[fail(display = "position delta was not in the appropriate range")]
     PositionDeltaOutOfRange,
 }
