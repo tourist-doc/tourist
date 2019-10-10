@@ -93,46 +93,46 @@ pub struct TourView {
 pub trait TouristRpc {
     /// List all tours that are currently open, along with their titles.
     #[rpc(name = "list_tours")]
-    fn list_tours(&self) -> JsonResult<Vec<(TourId, String)>>;
+    fn rpc_list_tours(&self) -> JsonResult<Vec<(TourId, String)>>;
 
     /// Create a new tour and open it in edit mode. Returns the new tour's ID.
     #[rpc(name = "create_tour")]
-    fn create_tour(&self, title: String) -> JsonResult<TourId>;
+    fn rpc_create_tour(&self, title: String) -> JsonResult<TourId>;
 
     /// Open an existing tour from disk. If `edit` is true, the tour will be available for editing.
     /// Returns the opened tour's ID.
     #[rpc(name = "open_tour")]
-    fn open_tour(&self, path: PathBuf, edit: bool) -> JsonResult<TourId>;
+    fn rpc_open_tour(&self, path: PathBuf, edit: bool) -> JsonResult<TourId>;
 
     /// Sets a tour as uneditable.
     #[rpc(name = "freeze_tour")]
-    fn freeze_tour(&self, tour_id: TourId) -> JsonResult<()>;
+    fn rpc_freeze_tour(&self, tour_id: TourId) -> JsonResult<()>;
 
     /// Sets a tour as editable.
     #[rpc(name = "unfreeze_tour")]
-    fn unfreeze_tour(&self, tour_id: TourId) -> JsonResult<()>;
+    fn rpc_unfreeze_tour(&self, tour_id: TourId) -> JsonResult<()>;
 
     /// View all of the top-level data for a tour.
     #[rpc(name = "view_tour")]
-    fn view_tour(&self, tour_id: TourId) -> JsonResult<TourView>;
+    fn rpc_view_tour(&self, tour_id: TourId) -> JsonResult<TourView>;
 
     /// Edit tour metadata, e.g. title and description. The delta object has a number of optional
     /// fields; those that are set will be applied.
     #[rpc(name = "edit_tour_metadata")]
-    fn edit_tour_metadata(&self, tour_id: TourId, delta: TourMetadata) -> JsonResult<()>;
+    fn rpc_edit_tour_metadata(&self, tour_id: TourId, delta: TourMetadata) -> JsonResult<()>;
 
     /// Remove a tour from the list of tracked tours. If you would like to delete the tour from disk
     /// as well, use `delete_tour`.
     #[rpc(name = "forget_tour")]
-    fn forget_tour(&self, tour_id: TourId) -> JsonResult<()>;
+    fn rpc_forget_tour(&self, tour_id: TourId) -> JsonResult<()>;
 
     /// Reset any edits made to a tour from its backing file.
     #[rpc(name = "reset_tour")]
-    fn reload_tour(&self, tour_id: TourId) -> JsonResult<()>;
+    fn rpc_reload_tour(&self, tour_id: TourId) -> JsonResult<()>;
 
     /// Create a new stop in the given tour. Returns the ID of the new stop.
     #[rpc(name = "create_stop")]
-    fn create_stop(
+    fn rpc_create_stop(
         &self,
         tour_id: TourId,
         title: String,
@@ -142,12 +142,12 @@ pub trait TouristRpc {
 
     /// View all of the top-level data for a stop.
     #[rpc(name = "view_stop")]
-    fn view_stop(&self, tour_id: TourId, stop_id: StopId) -> JsonResult<StopView>;
+    fn rpc_view_stop(&self, tour_id: TourId, stop_id: StopId) -> JsonResult<StopView>;
 
     /// Edit stop metadata, e.g. title and description. The delta object has a number of optional
     /// fields; those that are set will be applied.
     #[rpc(name = "edit_stop_metadata")]
-    fn edit_stop_metadata(
+    fn rpc_edit_stop_metadata(
         &self,
         tour_id: TourId,
         stop_id: StopId,
@@ -156,7 +156,7 @@ pub trait TouristRpc {
 
     /// Move a stop to a different place in the codebase.
     #[rpc(name = "move_stop")]
-    fn move_stop(
+    fn rpc_move_stop(
         &self,
         tour_id: TourId,
         stop_id: StopId,
@@ -167,7 +167,7 @@ pub trait TouristRpc {
     /// Change the order of a tour's stops. Position delta is applied to the position of the stop in
     /// the list, bounded by the length of the list.
     #[rpc(name = "reorder_stop")]
-    fn reorder_stop(
+    fn rpc_reorder_stop(
         &self,
         tour_id: TourId,
         stop_id: StopId,
@@ -177,7 +177,7 @@ pub trait TouristRpc {
     /// Link a tour stop to another tour or tour stop. If `other_stop_id` is `None`, the link will
     /// go to the tour's landing page. Otherwise the link will go to the stop itself.
     #[rpc(name = "link_stop")]
-    fn link_stop(
+    fn rpc_link_stop(
         &self,
         tour_id: TourId,
         stop_id: StopId,
@@ -187,7 +187,7 @@ pub trait TouristRpc {
 
     /// Unlink a tour stop from another tour or tour stop.
     #[rpc(name = "unlink_stop")]
-    fn unlink_stop(
+    fn rpc_unlink_stop(
         &self,
         tour_id: TourId,
         stop_id: StopId,
@@ -199,7 +199,7 @@ pub trait TouristRpc {
     /// directly from the tour file, with no adjustment; otherwise the location will be adjusted
     /// based on a git diff.
     #[rpc(name = "locate_stop")]
-    fn locate_stop(
+    fn rpc_locate_stop(
         &self,
         tour_id: TourId,
         stop_id: StopId,
@@ -208,27 +208,27 @@ pub trait TouristRpc {
 
     /// Remove a stop from an open tour.
     #[rpc(name = "remove_stop")]
-    fn remove_stop(&self, tour_id: TourId, stop_id: StopId) -> JsonResult<()>;
+    fn rpc_remove_stop(&self, tour_id: TourId, stop_id: StopId) -> JsonResult<()>;
 
     /// Refresh a tour's stops to the provided commit. If no commit is provided, HEAD is used.
     #[rpc(name = "refresh_tour")]
-    fn refresh_tour(&self, tour_id: TourId, commit: Option<String>) -> JsonResult<()>;
+    fn rpc_refresh_tour(&self, tour_id: TourId, commit: Option<String>) -> JsonResult<()>;
 
     /// Save a tour to disk. If the tour is new, a path must be provided; otherwise the path can be
     /// left empty.
     #[rpc(name = "save_tour")]
-    fn save_tour(&self, tour_id: TourId, path: Option<PathBuf>) -> JsonResult<()>;
+    fn rpc_save_tour(&self, tour_id: TourId, path: Option<PathBuf>) -> JsonResult<()>;
 
     /// Save all available tours to disk. This will fail if any tours are new.
     #[rpc(name = "save_all")]
-    fn save_all(&self) -> JsonResult<()>;
+    fn rpc_save_all(&self) -> JsonResult<()>;
 
     /// Remove a tour from the tracker and delete it from disk.
     #[rpc(name = "delete_tour")]
-    fn delete_tour(&self, tour_id: TourId) -> JsonResult<()>;
+    fn rpc_delete_tour(&self, tour_id: TourId) -> JsonResult<()>;
 
     /// Update the repository index, mapping a name to a path. If a null value is passed instead of
     /// a path, the name is removed from the index instead.
     #[rpc(name = "index_repository")]
-    fn index_repository(&self, repo_name: String, path: Option<PathBuf>) -> JsonResult<()>;
+    fn rpc_index_repository(&self, repo_name: String, path: Option<PathBuf>) -> JsonResult<()>;
 }

@@ -1,8 +1,6 @@
-use super::{
-    Result, StopMetadata, StopView, TourFileManager, TourId, TourMetadata, TourView, Tourist,
-    TouristRpc,
-};
-use crate::error;
+use super::io::TourFileManager;
+use super::*;
+use crate::error::Result;
 use crate::index::Index;
 use crate::types::path::{AbsolutePath, AbsolutePathBuf, RelativePathBuf};
 use crate::types::{Stop, StopReference, Tour};
@@ -71,7 +69,7 @@ struct MockVCS {
 }
 
 impl VCS for MockVCS {
-    fn get_current_version(&self, _repo_path: AbsolutePath<'_>) -> error::Result<String> {
+    fn get_current_version(&self, _repo_path: AbsolutePath<'_>) -> Result<String> {
         Ok("COMMIT".to_owned())
     }
 
@@ -80,19 +78,15 @@ impl VCS for MockVCS {
         _repo_path: AbsolutePath<'_>,
         _from: &str,
         _to: &str,
-    ) -> error::Result<Changes> {
+    ) -> Result<Changes> {
         Ok(self.last_changes.clone().unwrap())
     }
 
-    fn is_workspace_dirty(&self, _repo_path: AbsolutePath<'_>) -> error::Result<bool> {
+    fn is_workspace_dirty(&self, _repo_path: AbsolutePath<'_>) -> Result<bool> {
         Ok(false)
     }
 
-    fn diff_with_worktree(
-        &self,
-        _repo_path: AbsolutePath<'_>,
-        _from: &str,
-    ) -> error::Result<Changes> {
+    fn diff_with_worktree(&self, _repo_path: AbsolutePath<'_>, _from: &str) -> Result<Changes> {
         Ok(self.last_changes.clone().unwrap())
     }
 
@@ -101,7 +95,7 @@ impl VCS for MockVCS {
         _repo_path: AbsolutePath<'_>,
         _commit: &str,
         _file_path: &RelativePathBuf,
-    ) -> error::Result<Vec<u8>> {
+    ) -> Result<Vec<u8>> {
         panic!("No implementation needed yet. Add one if necessary.")
     }
 }
@@ -139,7 +133,7 @@ impl Index for MockIndex {
 }
 
 fn test_instance() -> (
-    Tourist<MockTourFileManager, MockVCS, MockIndex>,
+    Engine<MockTourFileManager, MockVCS, MockIndex>,
     MockTourFileManager,
     MockIndex,
 ) {
@@ -147,7 +141,7 @@ fn test_instance() -> (
     let manager = MockTourFileManager::new(Arc::clone(&tours));
     let index = MockIndex(Arc::new(RwLock::new(HashMap::new())));
     (
-        Tourist {
+        Engine {
             tours,
             manager: manager.clone(),
             vcs: MockVCS { last_changes: None },
