@@ -907,14 +907,12 @@ fn refresh_tour_test() {
     );
     tourist.vcs.last_changes = Some(changes);
 
-    tourist
-        .refresh_tour("TOURID".to_owned(), Some("NEW_COMMIT".to_owned()))
-        .unwrap();
+    tourist.refresh_tour("TOURID".to_owned()).unwrap();
 
     let tours = tourist.tours;
     let tour = tours.get("TOURID").unwrap();
     assert_eq!(tour.stops[0].line, 105);
-    assert_eq!(tour.repositories.get("my-repo").unwrap(), "NEW_COMMIT");
+    assert_eq!(tour.repositories.get("my-repo").unwrap(), "COMMIT");
 }
 
 #[test]

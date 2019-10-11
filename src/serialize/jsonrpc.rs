@@ -212,7 +212,7 @@ pub trait TouristRpc {
 
     /// Refresh a tour's stops to the provided commit. If no commit is provided, HEAD is used.
     #[rpc(name = "refresh_tour")]
-    fn rpc_refresh_tour(&self, tour_id: TourId, commit: Option<String>) -> JsonResult<()>;
+    fn rpc_refresh_tour(&self, tour_id: TourId) -> JsonResult<()>;
 
     /// Save a tour to disk. If the tour is new, a path must be provided; otherwise the path can be
     /// left empty.

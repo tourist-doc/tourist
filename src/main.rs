@@ -14,7 +14,6 @@ mod error;
 mod index;
 mod serialize;
 mod types;
-mod util;
 mod vcs;
 
 use command::{Dump, Package, Serve};

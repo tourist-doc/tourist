@@ -69,11 +69,8 @@ impl<
             .as_json_result()
     }
 
-    fn rpc_refresh_tour(&self, tour_id: TourId, commit: Option<String>) -> JsonResult<()> {
-        self.write()
-            .unwrap()
-            .refresh_tour(tour_id, commit)
-            .as_json_result()
+    fn rpc_refresh_tour(&self, tour_id: TourId) -> JsonResult<()> {
+        self.write().unwrap().refresh_tour(tour_id).as_json_result()
     }
 
     fn rpc_forget_tour(&self, tour_id: TourId) -> JsonResult<()> {

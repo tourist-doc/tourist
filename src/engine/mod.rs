@@ -1,6 +1,5 @@
 use crate::error::{Error, ErrorKind, Result};
 use crate::index::Index;
-use crate::kv;
 use crate::types::path::{AbsolutePathBuf, RelativePathBuf};
 use crate::types::{Stop, StopReference, Tour};
 use crate::vcs::VCS;
@@ -123,15 +122,10 @@ macro_rules! tourist_ref_mut {
 }
 
 impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
-    /// Get a mutable reference to the currently managed map of tours. In the event of a
-    /// `PoisonError`, we panic.
-    /// Determines if a particular tour is editable. In the event of a `PoisonError`, we panic.
     fn is_editable(&self, tour_id: &str) -> bool {
         self.edits.contains(tour_id)
     }
 
-    /// Sets whether or not a particular tour is editable. In the event of a `PoisonError`, we
-    /// panic.
     fn set_editable(&mut self, tour_id: TourId, edit: bool) {
         if edit {
             self.edits.insert(tour_id);
@@ -185,8 +179,8 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
 
     pub fn create_tour(&mut self, title: String) -> Result<TourId> {
         info!(
-            "called Engine::create_tour with args {:?}",
-            kv! { "title" => &title }
+            "called Engine::create_tour with args: {{ title: {} }}",
+            &title,
         );
         let id = format!("{}", Uuid::new_v4().to_simple());
         let new_tour = Tour {
@@ -203,12 +197,16 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
     }
 
     pub fn open_tour(&mut self, path: PathBuf, edit: bool) -> Result<TourId> {
+        info!(
+            "called Engine::open_tour with args: {{ path: {}, edit: {} }}",
+            path.display(),
+            edit,
+        );
         let tour = self.manager.load_tour(path)?;
         let id = tour.id.clone();
         self.tours.insert(tour.id.clone(), tour);
         if edit {
             self.set_editable(id.clone(), true);
-            self.refresh_tour(id.clone(), None)?;
         }
         Ok(id)
     }
@@ -221,7 +219,6 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
 
     pub fn unfreeze_tour(&mut self, tour_id: TourId) -> Result<()> {
         self.set_editable(tour_id.clone(), true);
-        self.refresh_tour(tour_id, None)?;
         Ok(())
     }
 
@@ -258,38 +255,39 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         Ok(())
     }
 
-    pub fn refresh_tour(&mut self, tour_id: TourId, commit: Option<String>) -> Result<()> {
+    pub fn refresh_tour(&mut self, tour_id: TourId) -> Result<()> {
+        info!(
+            "called Engine::refresh_tour with args: {{ tour_id: {} }}",
+            &tour_id,
+        );
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into());
         }
         tourist_ref_mut!(self, tour_id, tour);
         let mut new_versions = HashMap::new();
-        for mut stop in tour.stops.iter_mut() {
-            let repo_path = self.index.get(&stop.repository)?.ok_or_else(|| {
-                ErrorKind::RepositoryNotInIndex.attach("Repository", &stop.repository)
-            })?;
-            let tour_version = tour.repositories.get(&stop.repository).ok_or_else(|| {
-                ErrorKind::NoVersionForRepository.attach("Repository", stop.repository.clone())
-            })?;
-            let target_version = if let Some(commit) = commit.clone() {
-                commit
-            } else {
-                self.vcs.get_current_version(repo_path.as_absolute_path())?
-            };
+        for (repo_name, tour_version) in &tour.repositories {
+            debug!("refreshing {} in tour {}", repo_name, &tour_id);
+            let repo_path = self
+                .index
+                .get(repo_name)?
+                .ok_or_else(|| ErrorKind::RepositoryNotInIndex.attach("Repository", repo_name))?;
+            let target_version = self.vcs.get_current_version(repo_path.as_absolute_path())?;
             let changes = self.vcs.diff_with_version(
                 repo_path.as_absolute_path(),
-                &tour_version,
+                tour_version,
                 &target_version,
             )?;
-            if let Some(file_changes) = changes.for_file(&stop.path) {
-                if let Some(line) = file_changes.adjust_line(stop.line) {
-                    stop.line = line;
-                } else {
-                    warn!("stop broke\nchanges:\n{:?}\n", file_changes);
-                    stop.broken = Some("line was deleted".to_owned());
+            for stop in tour.stops.iter_mut().filter(|s| s.repository == *repo_name) {
+                if let Some(file_changes) = changes.for_file(&stop.path) {
+                    if let Some(line) = file_changes.adjust_line(stop.line) {
+                        stop.line = line;
+                    } else {
+                        warn!("stop {} broke. changes:\n{:?}\n", &stop.id, file_changes);
+                        stop.broken = Some("line was deleted".to_owned());
+                    }
                 }
             }
-            new_versions.insert(stop.repository.clone(), target_version.clone());
+            new_versions.insert(repo_name.clone(), target_version);
         }
         tour.repositories.extend(new_versions);
         Ok(())
