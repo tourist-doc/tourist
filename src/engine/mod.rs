@@ -648,4 +648,17 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         self.manager.delete_tour(tour_id)?;
         Ok(())
     }
+
+    pub fn checkout_for_tour(&self, tour_id: TourId) -> Result<()> {
+        tourist_ref!(self, tour_id, tour);
+        for (repo_name, version) in tour.repositories.iter() {
+            let path = self
+                .index
+                .get(&repo_name)?
+                .ok_or_else(|| ErrorKind::RepositoryNotInIndex.attach("repo", repo_name.clone()))?;
+            self.vcs
+                .checkout_version(path.as_absolute_path(), &version)?;
+        }
+        Ok(())
+    }
 }

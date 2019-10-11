@@ -184,13 +184,13 @@ impl VCS for Git {
             ErrorKind::InvalidRepositoryPath
                 .attach("repo_path", format!("{}", repo_path.as_path().display()))
         })?;
+        let oid = Oid::from_str(to).context(ErrorKind::InvalidCommitHash)?;
         let obj = repo
-            .find_object(
-                Oid::from_str(to).context(ErrorKind::InvalidCommitHash)?,
-                Some(ObjectType::Commit),
-            )
+            .find_object(oid, Some(ObjectType::Commit))
             .context(ErrorKind::InvalidCommitHash)?;
         repo.checkout_tree(&obj, None)
+            .context(ErrorKind::FailedToCheckOutRepository)?;
+        repo.set_head_detached(oid)
             .context(ErrorKind::FailedToCheckOutRepository)?;
         Ok(())
     }

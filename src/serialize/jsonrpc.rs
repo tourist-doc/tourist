@@ -231,4 +231,8 @@ pub trait TouristRpc {
     /// a path, the name is removed from the index instead.
     #[rpc(name = "index_repository")]
     fn rpc_index_repository(&self, repo_name: String, path: Option<PathBuf>) -> JsonResult<()>;
+
+    /// Check out the appropriate version of each of the tour's repositories.
+    #[rpc(name = "checkout_for_tour")]
+    fn rpc_checkout_for_tour(&self, tour_id: TourId) -> JsonResult<()>;
 }

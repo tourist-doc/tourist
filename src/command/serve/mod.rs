@@ -195,6 +195,10 @@ impl<M: TourFileManager, V: VCS, I: Index> TouristRpc for Engine<M, V, I> {
     fn rpc_delete_tour(&self, tour_id: TourId) -> JsonResult<()> {
         self.delete_tour(tour_id).as_json_result()
     }
+
+    fn rpc_checkout_for_tour(&self, tour_id: TourId) -> JsonResult<()> {
+        self.checkout_for_tour(tour_id).as_json_result()
+    }
 }
 
 pub struct Serve<V: VCS, I: Index> {
