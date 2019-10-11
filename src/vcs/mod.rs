@@ -8,7 +8,7 @@ mod changes;
 pub use changes::{Changes, FileChanges, LineChanges};
 use changes::{DiffFileEvent, DiffLineEvent};
 
-pub trait VCS: Send + Sync + 'static + Clone {
+pub trait VCS {
     fn get_current_version(&self, repo_path: AbsolutePath<'_>) -> Result<String>;
 
     fn diff_with_version(

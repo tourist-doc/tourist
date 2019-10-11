@@ -71,56 +71,12 @@ pub struct TourView {
     pub edit: bool,
 }
 
-type Tracker = HashMap<TourId, Tour>;
-
 pub struct Engine<M: TourFileManager, V: VCS, I: Index> {
-    pub tours: Tracker,
+    pub tours: HashMap<TourId, Tour>,
     pub edits: HashSet<TourId>,
     pub manager: M,
     pub vcs: V,
     pub index: I,
-}
-
-impl StopMetadata {
-    fn apply_to(mut self, stop: &mut Stop) {
-        if let Some(title) = self.title.take() {
-            stop.title = title;
-        }
-        if let Some(description) = self.description.take() {
-            stop.description = description;
-        }
-    }
-}
-
-impl TourMetadata {
-    fn apply_to(mut self, tour: &mut Tour) {
-        if let Some(title) = self.title.take() {
-            tour.title = title;
-        }
-        if let Some(description) = self.description.take() {
-            tour.description = description;
-        }
-    }
-}
-
-fn resolve_path<I: Index>(index: &I, repository: &str) -> Result<AbsolutePathBuf> {
-    index
-        .get(repository)?
-        .ok_or_else(|| ErrorKind::RepositoryNotInIndex.attach("Repository", repository))
-}
-
-fn find_path_in_context<I: Index>(
-    index: &I,
-    path: PathBuf,
-) -> Result<(RelativePathBuf, String, AbsolutePathBuf)> {
-    let deep = AbsolutePathBuf::new(path.clone())
-        .ok_or_else(|| ErrorKind::ExpectedAbsolutePath.attach("Path", path.display()))?;
-    for (repo_name, repo_path) in index.all()? {
-        if let Some(rel) = deep.try_relative(repo_path.as_absolute_path()) {
-            return Ok((rel, repo_name.to_owned(), repo_path.clone()));
-        }
-    }
-    Err(ErrorKind::NoRepositoryForFile.attach("Path", path.display()))
 }
 
 macro_rules! tourist_ref {
@@ -203,6 +159,20 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         Ok(eqs.into_iter().all(|x| x))
     }
 
+    fn find_path_in_context(
+        &self,
+        path: PathBuf,
+    ) -> Result<(RelativePathBuf, String, AbsolutePathBuf)> {
+        let deep = AbsolutePathBuf::new(path.clone())
+            .ok_or_else(|| ErrorKind::ExpectedAbsolutePath.attach("Path", path.display()))?;
+        for (repo_name, repo_path) in self.index.all()? {
+            if let Some(rel) = deep.try_relative(repo_path.as_absolute_path()) {
+                return Ok((rel, repo_name.to_owned(), repo_path.clone()));
+            }
+        }
+        Err(ErrorKind::NoRepositoryForFile.attach("Path", path.display()))
+    }
+
     pub fn list_tours(&self) -> Result<Vec<(TourId, String)>> {
         Ok(self
             .tours
@@ -268,12 +238,17 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         })
     }
 
-    pub fn edit_tour_metadata(&mut self, tour_id: TourId, delta: TourMetadata) -> Result<()> {
+    pub fn edit_tour_metadata(&mut self, tour_id: TourId, mut delta: TourMetadata) -> Result<()> {
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into());
         }
         tourist_ref_mut!(self, tour_id, tour);
-        delta.apply_to(tour);
+        if let Some(title) = delta.title.take() {
+            tour.title = title;
+        }
+        if let Some(description) = delta.description.take() {
+            tour.description = description;
+        }
         Ok(())
     }
 
@@ -284,7 +259,9 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         tourist_ref_mut!(self, tour_id, tour);
         let mut new_versions = HashMap::new();
         for mut stop in tour.stops.iter_mut() {
-            let repo_path = resolve_path(&self.index, &stop.repository)?;
+            let repo_path = self.index.get(&stop.repository)?.ok_or_else(|| {
+                ErrorKind::RepositoryNotInIndex.attach("Repository", &stop.repository)
+            })?;
             let tour_version = tour.repositories.get(&stop.repository).ok_or_else(|| {
                 ErrorKind::NoVersionForRepository.attach("Repository", stop.repository.clone())
             })?;
@@ -340,7 +317,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
             return Err(ErrorKind::TourNotUpToDate.into());
         }
         let id = format!("{}", Uuid::new_v4().to_simple());
-        let (rel_path, repo, repo_path) = find_path_in_context(&self.index, path)?;
+        let (rel_path, repo, repo_path) = self.find_path_in_context(path)?;
         let stop = Stop {
             id: id.clone(),
             title,
@@ -409,13 +386,18 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         &mut self,
         tour_id: TourId,
         stop_id: StopId,
-        delta: StopMetadata,
+        mut delta: StopMetadata,
     ) -> Result<()> {
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into());
         }
         tourist_ref_mut!(self, tour_id, stop_id, tour, stop);
-        delta.apply_to(stop);
+        if let Some(title) = delta.title.take() {
+            stop.title = title;
+        }
+        if let Some(description) = delta.description.take() {
+            stop.description = description;
+        }
         Ok(())
     }
 
@@ -432,7 +414,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         if !self.is_up_to_date(&tour_id)? {
             return Err(ErrorKind::TourNotUpToDate.into());
         }
-        let (rel_path, repo, repo_path) = find_path_in_context(&self.index, path)?;
+        let (rel_path, repo, repo_path) = self.find_path_in_context(path)?;
         // Two things need to happen here:
         // 1. The stop needs to be moved to the approapriate relative stop/line.
         // 2. If this change happens to modify `tour.repositories`, that needs to be handled.
@@ -539,7 +521,9 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         naive: bool,
     ) -> Result<Option<(PathBuf, usize)>> {
         tourist_ref!(self, tour_id, stop_id, tour, stop);
-        let path = resolve_path(&self.index, &stop.repository)?;
+        let path = self.index.get(&stop.repository)?.ok_or_else(|| {
+            ErrorKind::RepositoryNotInIndex.attach("Repository", &stop.repository)
+        })?;
         let line = if naive {
             Some(stop.line)
         } else {

@@ -10,7 +10,6 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::{Arc, RwLock};
 
 #[derive(Clone)]
 pub struct MockTourFileManager {
@@ -98,54 +97,48 @@ impl VCS for MockVCS {
 }
 
 #[derive(Clone)]
-struct MockIndex(pub Arc<RwLock<HashMap<String, AbsolutePathBuf>>>);
+struct MockIndex(pub Rc<RefCell<HashMap<String, AbsolutePathBuf>>>);
 
 impl Index for MockIndex {
     fn get(&self, repo_name: &str) -> Result<Option<AbsolutePathBuf>> {
-        Ok(self.0.read().unwrap().get(repo_name).cloned())
+        Ok(self.0.borrow().get(repo_name).cloned())
     }
 
     fn set(&self, repo_name: &str, path: &AbsolutePathBuf) -> Result<()> {
         self.0
-            .write()
-            .unwrap()
+            .borrow_mut()
             .insert(repo_name.to_owned(), path.clone());
         Ok(())
     }
 
     fn unset(&self, repo_name: &str) -> Result<()> {
-        self.0.write().unwrap().remove(repo_name);
+        self.0.borrow_mut().remove(repo_name);
         Ok(())
     }
 
     fn all(&self) -> Result<Vec<(String, AbsolutePathBuf)>> {
         Ok(self
             .0
-            .read()
-            .unwrap()
+            .borrow()
             .iter()
             .map(|(k, v)| (k.to_owned(), v.clone()))
             .collect())
     }
 }
 
-fn test_instance() -> (Engine<MockTourFileManager, MockVCS, MockIndex>, MockIndex) {
-    let index = MockIndex(Arc::new(RwLock::new(HashMap::new())));
-    (
-        Engine {
-            tours: HashMap::new(),
-            manager: MockTourFileManager::new(),
-            edits: HashSet::new(),
-            vcs: MockVCS { last_changes: None },
-            index: index.clone(),
-        },
-        index,
-    )
+fn test_instance() -> Engine<MockTourFileManager, MockVCS, MockIndex> {
+    Engine {
+        tours: HashMap::new(),
+        manager: MockTourFileManager::new(),
+        edits: HashSet::new(),
+        vcs: MockVCS { last_changes: None },
+        index: MockIndex(Rc::new(RefCell::new(HashMap::new()))),
+    }
 }
 
 #[test]
 fn list_tours_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -166,7 +159,7 @@ fn list_tours_test() {
 
 #[test]
 fn create_tour_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     let id = tourist
         .create_tour("My first tour".to_owned())
         .expect("Call to create failed");
@@ -179,7 +172,7 @@ fn create_tour_test() {
 fn open_tour_test() {
     let tour_file = PathBuf::from("some/path");
 
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
 
     tourist.manager.file_system.borrow_mut().insert(
         tour_file.clone(),
@@ -204,7 +197,7 @@ fn open_tour_test() {
 
 #[test]
 fn freeze_unfreeze_tour_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     let tour = Tour {
         generator: 0,
         id: "TOURID".to_owned(),
@@ -234,7 +227,7 @@ fn freeze_unfreeze_tour_test() {
 
 #[test]
 fn view_tour_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -275,7 +268,7 @@ fn view_tour_test() {
 
 #[test]
 fn edit_tour_metadata_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -331,7 +324,7 @@ fn edit_tour_metadata_test() {
 
 #[test]
 fn forget_tour_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -350,7 +343,7 @@ fn forget_tour_test() {
 
 #[test]
 fn reload_tour_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     let tour = Tour {
         generator: 0,
         id: "TOURID".to_owned(),
@@ -389,9 +382,10 @@ fn reload_tour_test() {
 
 #[test]
 fn create_stop_test() {
-    let (mut tourist, index) = test_instance();
+    let mut tourist = test_instance();
     let root = dirs::download_dir().unwrap();
-    index
+    tourist
+        .index
         .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
         .unwrap();
     tourist.tours.insert(
@@ -428,7 +422,7 @@ fn create_stop_test() {
 
 #[test]
 fn view_stop_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -468,7 +462,7 @@ fn view_stop_test() {
 
 #[test]
 fn edit_stop_metadata_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -526,8 +520,9 @@ fn edit_stop_metadata_test() {
 
 #[test]
 fn move_stop_test() {
-    let (mut tourist, index) = test_instance();
-    index
+    let mut tourist = test_instance();
+    tourist
+        .index
         .set(
             "my-repo",
             &AbsolutePathBuf::new(PathBuf::from("/foo")).unwrap(),
@@ -578,7 +573,7 @@ fn move_stop_test() {
 
 #[test]
 fn reorder_stop_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -670,7 +665,7 @@ fn reorder_stop_test() {
 
 #[test]
 fn link_stop_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -728,7 +723,7 @@ fn link_stop_test() {
 
 #[test]
 fn unlink_stop_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -791,9 +786,10 @@ fn unlink_stop_test() {
 
 #[test]
 fn locate_stop_test() {
-    let (mut tourist, index) = test_instance();
+    let mut tourist = test_instance();
     let root = dirs::download_dir().unwrap();
-    index
+    tourist
+        .index
         .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
         .unwrap();
     tourist.tours.insert(
@@ -848,7 +844,7 @@ fn locate_stop_test() {
 
 #[test]
 fn remove_stop_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -884,9 +880,10 @@ fn remove_stop_test() {
 
 #[test]
 fn refresh_tour_test() {
-    let (mut tourist, index) = test_instance();
+    let mut tourist = test_instance();
     let root = dirs::download_dir().unwrap();
-    index
+    tourist
+        .index
         .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
         .unwrap();
     tourist.tours.insert(
@@ -939,7 +936,7 @@ fn refresh_tour_test() {
 
 #[test]
 fn save_tour_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -979,7 +976,7 @@ fn save_tour_test() {
 
 #[test]
 fn delete_tour_test() {
-    let (mut tourist, _) = test_instance();
+    let mut tourist = test_instance();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -1017,13 +1014,13 @@ fn delete_tour_test() {
 
 #[test]
 fn index_repository_test() {
-    let (mut tourist, index) = test_instance();
+    let mut tourist = test_instance();
     let root = dirs::download_dir().unwrap();
     tourist
         .index_repository("my-repo".to_owned(), Some(root.join("foo")))
         .unwrap();
     assert_eq!(
-        index.get("my-repo").unwrap().unwrap(),
+        tourist.index.get("my-repo").unwrap().unwrap(),
         AbsolutePathBuf::new(root.join("foo")).unwrap()
     );
 }

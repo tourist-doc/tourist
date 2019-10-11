@@ -2,7 +2,7 @@ use crate::config::{config, write_config, Config};
 use crate::error::Result;
 use crate::types::path::AbsolutePathBuf;
 
-pub trait Index: Send + Sync + 'static + Clone {
+pub trait Index {
     fn get(&self, repo_name: &str) -> Result<Option<AbsolutePathBuf>>;
     fn set(&self, repo_name: &str, path: &AbsolutePathBuf) -> Result<()>;
     fn unset(&self, repo_name: &str) -> Result<()>;

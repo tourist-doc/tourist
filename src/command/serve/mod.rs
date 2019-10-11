@@ -14,8 +14,11 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-impl<M: TourFileManager + Send + Sync + 'static, V: VCS, I: Index> TouristRpc
-    for Arc<RwLock<Engine<M, V, I>>>
+impl<
+        M: TourFileManager + Send + Sync + 'static,
+        V: VCS + Send + Sync + 'static,
+        I: Index + Send + Sync + 'static,
+    > TouristRpc for Arc<RwLock<Engine<M, V, I>>>
 {
     fn rpc_list_tours(&self) -> JsonResult<Vec<(TourId, String)>> {
         self.read().unwrap().list_tours().as_json_result()
@@ -239,12 +242,12 @@ impl<M: TourFileManager + Send + Sync + 'static, V: VCS, I: Index> TouristRpc
     }
 }
 
-pub struct Serve<V: VCS, I: Index> {
+pub struct Serve<V: VCS + Send + Sync + 'static, I: Index + Send + Sync + 'static> {
     vcs: V,
     index: I,
 }
 
-impl<V: VCS, I: Index> Serve<V, I> {
+impl<V: VCS + Send + Sync + 'static, I: Index + Send + Sync + 'static> Serve<V, I> {
     pub fn new(vcs: V, index: I) -> Self {
         Serve { vcs, index }
     }
