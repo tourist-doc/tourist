@@ -44,7 +44,6 @@ impl Arbitrary for Tour {
             description: Arbitrary::arbitrary(g),
             stops: Arbitrary::arbitrary(g),
             repositories: Arbitrary::arbitrary(g),
-            generator: Arbitrary::arbitrary(g),
         }
     }
 }

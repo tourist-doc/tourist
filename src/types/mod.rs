@@ -34,5 +34,4 @@ pub struct Tour {
     pub description: String,
     pub stops: Vec<Stop>,
     pub repositories: HashMap<String, String>,
-    pub generator: usize,
 }

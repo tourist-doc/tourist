@@ -142,7 +142,6 @@ fn list_tours_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -177,7 +176,6 @@ fn open_tour_test() {
     tourist.manager.file_system.borrow_mut().insert(
         tour_file.clone(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -199,7 +197,6 @@ fn open_tour_test() {
 fn freeze_unfreeze_tour_test() {
     let mut tourist = test_instance();
     let tour = Tour {
-        generator: 0,
         id: "TOURID".to_owned(),
         title: "My first tour".to_owned(),
         description: "".to_owned(),
@@ -231,7 +228,6 @@ fn view_tour_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -272,7 +268,6 @@ fn edit_tour_metadata_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -328,7 +323,6 @@ fn forget_tour_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -345,7 +339,6 @@ fn forget_tour_test() {
 fn reload_tour_test() {
     let mut tourist = test_instance();
     let tour = Tour {
-        generator: 0,
         id: "TOURID".to_owned(),
         title: "My first tour".to_owned(),
         description: "".to_owned(),
@@ -391,7 +384,6 @@ fn create_stop_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -426,7 +418,6 @@ fn view_stop_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -466,7 +457,6 @@ fn edit_stop_metadata_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -531,7 +521,6 @@ fn move_stop_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -577,7 +566,6 @@ fn reorder_stop_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -669,7 +657,6 @@ fn link_stop_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -727,7 +714,6 @@ fn unlink_stop_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -795,7 +781,6 @@ fn locate_stop_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -848,7 +833,6 @@ fn remove_stop_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -889,7 +873,6 @@ fn refresh_tour_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -940,7 +923,6 @@ fn save_tour_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),
@@ -980,7 +962,6 @@ fn delete_tour_test() {
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
-            generator: 0,
             id: "TOURID".to_owned(),
             title: "My first tour".to_owned(),
             description: "".to_owned(),

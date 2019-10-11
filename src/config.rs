@@ -104,7 +104,6 @@ mod tests {
         fs::write(
             path,
             crate::serialize::serialize_tour(Tour {
-                generator: 0,
                 id: "TOURID".to_owned(),
                 title: "My first tour".to_owned(),
                 description: "".to_owned(),
@@ -125,7 +124,6 @@ mod tests {
             AbsolutePathBuf::new(temp_dir.path().to_path_buf()).unwrap()
         ])
         .unwrap();
-        assert_eq!(tours[0].0.generator, 0);
         assert_eq!(tours[0].0.title, "My first tour");
         assert_eq!(tours[0].0.stops.len(), 0);
 

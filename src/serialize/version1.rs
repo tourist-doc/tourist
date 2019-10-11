@@ -43,7 +43,6 @@ pub struct TourFile {
     pub description: String,
     pub stops: Vec<Stop>,
     pub repositories: Vec<Repository>,
-    pub generator: Option<usize>,
 }
 
 impl TryFrom<&str> for TourFile {
@@ -63,7 +62,6 @@ impl Into<types::Tour> for TourFile {
     fn into(self) -> types::Tour {
         types::Tour {
             protocol_version: self.protocol_version,
-            generator: self.generator.unwrap_or(0),
             id: self.id,
             title: self.title,
             description: self.description,
@@ -101,7 +99,6 @@ impl From<types::Tour> for TourFile {
     fn from(tour: types::Tour) -> Self {
         TourFile {
             protocol_version: tour.protocol_version,
-            generator: Some(tour.generator),
             id: tour.id,
             title: tour.title,
             description: tour.description,

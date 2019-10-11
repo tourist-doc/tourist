@@ -196,7 +196,6 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
             description: "".to_owned(),
             stops: Vec::new(),
             repositories: HashMap::new(),
-            generator: 0,
         };
         debug!("new tour with id: {}", &id);
         self.tours.insert(id.clone(), new_tour);
