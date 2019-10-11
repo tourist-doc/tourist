@@ -31,6 +31,7 @@ pub fn error_code(kind: &ErrorKind) -> i64 {
         TourNotEditable => 310,
         TourNotUpToDate => 311,
         NoPathForTour => 320,
+        WorkspaceIsDirty => 330,
 
         // Input Errors
         NoTourWithID => 400,
@@ -55,6 +56,7 @@ pub fn error_code(kind: &ErrorKind) -> i64 {
         FailedToParseTour => 541,
         FailedToParseRevision => 542,
         FailedToParseIndex => 543,
+        FailedToCheckOutRepository => 550,
 
         // Anomalies
         EncodingFailure => 600,
@@ -122,6 +124,10 @@ pub enum ErrorKind {
     TourNotUpToDate,
     #[fail(display = "position delta was not in the appropriate range")]
     PositionDeltaOutOfRange,
+    #[fail(display = "please stash local changes before continuing")]
+    WorkspaceIsDirty,
+    #[fail(display = "something went wrong when rolling back repository")]
+    FailedToCheckOutRepository,
 }
 
 impl Error {
@@ -132,7 +138,7 @@ impl Error {
 }
 
 impl Fail for Error {
-    fn cause(&self) -> Option<&Fail> {
+    fn cause(&self) -> Option<&dyn Fail> {
         self.inner.cause()
     }
 

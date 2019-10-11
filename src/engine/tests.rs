@@ -90,6 +90,10 @@ impl VCS for MockVCS {
         Ok(self.last_changes.clone().unwrap())
     }
 
+    fn checkout_version(&self, _repo_version: AbsolutePath<'_>, _to: &str) -> Result<()> {
+        Ok(())
+    }
+
     fn lookup_file_bytes(
         &self,
         _repo_path: AbsolutePath<'_>,

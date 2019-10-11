@@ -57,7 +57,7 @@ impl AbsolutePathBuf {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub struct AbsolutePath<'a>(&'a Path);
 
 impl<'a> AbsolutePath<'a> {

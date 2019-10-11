@@ -1,7 +1,7 @@
 use crate::error::{Error, ErrorKind, Result};
 use crate::types::path::{AbsolutePath, RelativePathBuf};
 use failure::ResultExt;
-use git2::{DiffOptions, Oid, Repository};
+use git2::{Commit, DiffOptions, ObjectType, Oid, Repository};
 
 mod changes;
 
@@ -21,6 +21,8 @@ pub trait VCS: Send + Sync + 'static + Clone {
     fn diff_with_worktree(&self, repo_path: AbsolutePath<'_>, from: &str) -> Result<Changes>;
 
     fn is_workspace_dirty(&self, repo_path: AbsolutePath<'_>) -> Result<bool>;
+
+    fn checkout_version(&self, repo_path: AbsolutePath<'_>, to: &str) -> Result<()>;
 
     fn lookup_file_bytes(
         &self,
@@ -47,6 +49,15 @@ pub struct Git;
 
 impl Git {
     fn diff(&self, repo_path: AbsolutePath<'_>, from: &str, to: Option<&str>) -> Result<Changes> {
+        let from_oid = Oid::from_str(from).context(ErrorKind::InvalidCommitHash)?;
+        let to_oid = match to {
+            Some(to) => Some(Oid::from_str(to).context(ErrorKind::InvalidCommitHash)?),
+            None => None,
+        };
+        self.diff_oid(repo_path, from_oid, to_oid)
+    }
+
+    fn diff_oid(&self, repo_path: AbsolutePath<'_>, from: Oid, to: Option<Oid>) -> Result<Changes> {
         let repo = Repository::open(repo_path.as_path())
             .context(ErrorKind::InvalidRepositoryPath)
             .or_else(|e| {
@@ -54,16 +65,18 @@ impl Git {
                     .attach("repo_path", format!("{}", repo_path.as_path().display())))
             })?;
 
-        let from_tree = Oid::from_str(from)
-            .and_then(|oid| repo.find_commit(oid)?.tree())
+        let from_tree = repo
+            .find_commit(from)
+            .and_then(|c| c.tree())
             .context(ErrorKind::InvalidCommitHash)?;
         let mut opts = DiffOptions::new();
         opts.minimal(true);
         opts.ignore_whitespace_eol(true);
 
         let diff = if let Some(to) = to {
-            let to_tree = Oid::from_str(to)
-                .and_then(|oid| repo.find_commit(oid)?.tree())
+            let to_tree = repo
+                .find_commit(to)
+                .and_then(|c| c.tree())
                 .context(ErrorKind::InvalidCommitHash)?;
             repo.diff_tree_to_tree(Some(&from_tree), Some(&to_tree), Some(&mut opts))
                 .context(ErrorKind::DiffFailed)?
@@ -107,6 +120,19 @@ impl Git {
             .for_each(|e| changes.process_line(e));
         Ok(changes)
     }
+
+    fn head_commit<'a>(&self, repo: &'a Repository) -> Result<Commit<'a>> {
+        let obj = repo
+            .head()
+            .and_then(|h| h.resolve())
+            .and_then(|o| o.peel(ObjectType::Commit))
+            .context(ErrorKind::InvalidCommitHash)?;
+        let commit = obj
+            .into_commit()
+            .map_err(|_| git2::Error::from_str("object not commit"))
+            .context(ErrorKind::InvalidCommitHash)?;
+        Ok(commit)
+    }
 }
 
 impl VCS for Git {
@@ -117,10 +143,7 @@ impl VCS for Git {
                 Err(Error::from(e)
                     .attach("repo_path", format!("{}", repo_path.as_path().display())))
             })?;
-        let id = repo
-            .head()
-            .and_then(|head| Ok(head.peel_to_commit()?.id()))
-            .context(ErrorKind::InvalidCommitHash)?;
+        let id = self.head_commit(&repo)?.id();
         Ok(format!("{}", id))
     }
 
@@ -130,12 +153,11 @@ impl VCS for Git {
         commit: &str,
         file_path: &RelativePathBuf,
     ) -> Result<Vec<u8>> {
-        let repo = Repository::open(repo_path.as_path())
-            .context(ErrorKind::InvalidRepositoryPath)
-            .or_else(|e| {
-                Err(Error::from(e)
-                    .attach("repo_path", format!("{}", repo_path.as_path().display())))
-            })?;
+        let repo = Repository::open(repo_path.as_path()).map_err(|_| {
+            ErrorKind::InvalidRepositoryPath
+                .attach("repo_path", format!("{}", repo_path.as_path().display()))
+        })?;
+
         let rev = format!("{}:{}", commit, file_path.as_git_path());
         let obj = repo
             .revparse_single(&rev)
@@ -145,8 +167,32 @@ impl VCS for Git {
     }
 
     fn is_workspace_dirty(&self, repo_path: AbsolutePath<'_>) -> Result<bool> {
-        let changes = self.diff(repo_path, "HEAD", None)?;
+        let repo = Repository::open(repo_path.as_path()).map_err(|_| {
+            ErrorKind::InvalidRepositoryPath
+                .attach("repo_path", format!("{}", repo_path.as_path().display()))
+        })?;
+        let commit = self.head_commit(&repo)?;
+        let changes = self.diff_oid(repo_path, commit.id(), None)?;
         Ok(!changes.is_empty())
+    }
+
+    fn checkout_version(&self, repo_path: AbsolutePath<'_>, to: &str) -> Result<()> {
+        if self.is_workspace_dirty(repo_path)? {
+            return Err(ErrorKind::WorkspaceIsDirty.into());
+        }
+        let repo = Repository::open(repo_path.as_path()).map_err(|_| {
+            ErrorKind::InvalidRepositoryPath
+                .attach("repo_path", format!("{}", repo_path.as_path().display()))
+        })?;
+        let obj = repo
+            .find_object(
+                Oid::from_str(to).context(ErrorKind::InvalidCommitHash)?,
+                Some(ObjectType::Commit),
+            )
+            .context(ErrorKind::InvalidCommitHash)?;
+        repo.checkout_tree(&obj, None)
+            .context(ErrorKind::FailedToCheckOutRepository)?;
+        Ok(())
     }
 
     fn diff_with_version(
@@ -168,30 +214,27 @@ mod tests {
     use super::changes::{FileChanges, LineChanges};
     use super::{Git, VCS};
     use crate::types::path::{AbsolutePathBuf, RelativePathBuf};
-    use git2::{Commit, ObjectType, Oid, Repository, Signature};
+    use git2::{Oid, Repository, Signature};
     use std::fs;
     use std::path::Path;
     use std::str;
     use tempdir::TempDir;
 
-    fn find_last_commit(repo: &Repository) -> Result<Commit, git2::Error> {
-        let obj = repo.head()?.resolve()?.peel(ObjectType::Commit)?;
-        obj.into_commit()
-            .map_err(|_| git2::Error::from_str("Couldn't find commit"))
-    }
-
-    fn add_files<P: AsRef<Path>>(repo: &Repository, files: Vec<P>) -> Result<Oid, git2::Error> {
+    fn add_all(repo: &Repository) -> Result<Oid, git2::Error> {
         let mut index = repo.index()?;
-        for file in files {
-            index.add_path(file.as_ref())?;
-        }
-        index.write_tree()
+        index.add_all(
+            vec![] as Vec<String>,
+            git2::IndexAddOption::CHECK_PATHSPEC,
+            None,
+        )?;
+        index.write()?;
+        index.write_tree_to(repo)
     }
 
     fn commit(repo: &Repository, oid: Oid, message: &str) -> Result<Oid, git2::Error> {
         let signature = Signature::now("Test User", "test@user.net")?;
         let tree = repo.find_tree(oid)?;
-        let parent = match find_last_commit(&repo) {
+        let parent = match Git.head_commit(&repo) {
             Ok(p) => vec![p],
             Err(_) => vec![],
         };
@@ -216,13 +259,13 @@ mod tests {
         fs::write(&file1, "Hello, world!\nSomething else").unwrap();
         fs::write(&file2, "1\n2\n3").unwrap();
 
-        let oid = add_files(&repo, vec!["test.txt", "test2.txt"]).unwrap();
+        let oid = add_all(&repo).unwrap();
         let from_id = commit(&repo, oid, "commit 1").unwrap();
 
         fs::write(&file1, "Poop\nHello, world!\nGoodbye, world!").unwrap();
         fs::write(&file2, "2\n3\n4").unwrap();
 
-        let oid = add_files(&repo, vec!["test.txt", "test2.txt"]).unwrap();
+        let oid = add_all(&repo).unwrap();
         let to_id = commit(&repo, oid, "commit 2").unwrap();
 
         let changes = Git
@@ -245,5 +288,42 @@ mod tests {
             }),
             changes.for_file(&RelativePathBuf::from(Path::new("test.txt")))
         )
+    }
+
+    fn oid_to_string(oid: Oid) -> String {
+        oid.as_bytes()
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>()
+    }
+
+    #[test]
+    fn can_check_out() {
+        let repo_dir = TempDir::new("my_repo").unwrap().into_path();
+        let repo = Repository::init(&repo_dir).unwrap();
+
+        dbg!(&repo_dir);
+
+        let file = repo_dir.join("test.txt");
+
+        fs::write(&file, "Hello, world!").unwrap();
+
+        let oid = add_all(&repo).unwrap();
+        let first_id = commit(&repo, oid, "commit 1").unwrap();
+
+        fs::write(&file, "Goodbye world!").unwrap();
+
+        let oid = add_all(&repo).unwrap();
+        let _ = commit(&repo, oid, "commit 2").unwrap();
+
+        Git.checkout_version(
+            AbsolutePathBuf::new(repo_dir.clone())
+                .unwrap()
+                .as_absolute_path(),
+            &oid_to_string(first_id),
+        )
+        .expect("checkout failed for some reason");
+
+        assert_eq!(fs::read_to_string(&file).unwrap(), "Hello, world!");
     }
 }
