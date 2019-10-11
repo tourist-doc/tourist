@@ -1,10 +1,11 @@
 use crate::error::{Error, ErrorKind, Result};
 use crate::index::Index;
+use crate::kv;
 use crate::types::path::{AbsolutePathBuf, RelativePathBuf};
 use crate::types::{Stop, StopReference, Tour};
 use crate::vcs::VCS;
 use failure::ResultExt;
-use slog_scope::warn;
+use slog_scope::{debug, info, warn};
 use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -174,6 +175,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
     }
 
     pub fn list_tours(&self) -> Result<Vec<(TourId, String)>> {
+        info!("called Engine::list_tours");
         Ok(self
             .tours
             .values()
@@ -182,6 +184,10 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
     }
 
     pub fn create_tour(&mut self, title: String) -> Result<TourId> {
+        info!(
+            "called Engine::create_tour with args {:?}",
+            kv! { "title" => &title }
+        );
         let id = format!("{}", Uuid::new_v4().to_simple());
         let new_tour = Tour {
             protocol_version: "1.0".to_owned(),
@@ -192,6 +198,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
             repositories: HashMap::new(),
             generator: 0,
         };
+        debug!("new tour with id: {}", &id);
         self.tours.insert(id.clone(), new_tour);
         Ok(id)
     }
