@@ -9,7 +9,6 @@ use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use uuid::Uuid;
 
 #[cfg(test)]
@@ -75,8 +74,8 @@ pub struct TourView {
 type Tracker = HashMap<TourId, Tour>;
 
 pub struct Engine<M: TourFileManager, V: VCS, I: Index> {
-    pub tours: Arc<RwLock<Tracker>>,
-    pub edits: Arc<RwLock<HashSet<TourId>>>,
+    pub tours: Tracker,
+    pub edits: HashSet<TourId>,
     pub manager: M,
     pub vcs: V,
     pub index: I,
@@ -138,8 +137,8 @@ macro_rules! tourist_ref {
             })?;
     };
     ($inst:expr, $id:expr, $tour:ident) => {
-        let tours = $inst.get_tours();
-        let $tour = tours
+        let $tour = $inst
+            .tours
             .get(&$id)
             .ok_or_else(|| ErrorKind::NoTourWithID.attach("ID", $id.clone()))?;
     };
@@ -159,38 +158,28 @@ macro_rules! tourist_ref_mut {
             })?;
     };
     ($inst:expr, $id:expr, $tour:ident) => {
-        let mut tours = $inst.get_tours_mut();
-        let $tour = tours
+        let $tour = $inst
+            .tours
             .get_mut(&$id)
             .ok_or_else(|| ErrorKind::NoTourWithID.attach("ID", $id.clone()))?;
     };
 }
 
 impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
-    /// Get a reference to the currently managed map of tours. In the event of a `PoisonError`, we
-    /// panic.
-    fn get_tours(&self) -> RwLockReadGuard<HashMap<TourId, Tour>> {
-        self.tours.read().unwrap()
-    }
-
     /// Get a mutable reference to the currently managed map of tours. In the event of a
     /// `PoisonError`, we panic.
-    fn get_tours_mut(&self) -> RwLockWriteGuard<HashMap<TourId, Tour>> {
-        self.tours.write().unwrap()
-    }
-
     /// Determines if a particular tour is editable. In the event of a `PoisonError`, we panic.
     fn is_editable(&self, tour_id: &str) -> bool {
-        self.edits.read().unwrap().contains(tour_id)
+        self.edits.contains(tour_id)
     }
 
     /// Sets whether or not a particular tour is editable. In the event of a `PoisonError`, we
     /// panic.
-    fn set_editable(&self, tour_id: TourId, edit: bool) {
+    fn set_editable(&mut self, tour_id: TourId, edit: bool) {
         if edit {
-            self.edits.write().unwrap().insert(tour_id);
+            self.edits.insert(tour_id);
         } else {
-            self.edits.write().unwrap().remove(&tour_id);
+            self.edits.remove(&tour_id);
         }
     }
 
@@ -205,10 +194,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
             Ok(tour_v == &curr_v && !self.vcs.is_workspace_dirty(path.as_absolute_path())?)
         };
 
-        let tours = self.get_tours();
-        let tour = tours
-            .get(tour_id)
-            .ok_or_else(|| ErrorKind::NoTourWithID.attach("ID", tour_id))?;
+        tourist_ref!(self, tour_id.to_owned(), tour);
         let eqs = tour
             .repositories
             .iter()
@@ -218,14 +204,14 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
     }
 
     pub fn list_tours(&self) -> Result<Vec<(TourId, String)>> {
-        let tours = self.get_tours();
-        Ok(tours
+        Ok(self
+            .tours
             .values()
             .map(|tour| (tour.id.clone(), tour.title.clone()))
             .collect())
     }
 
-    pub fn create_tour(&self, title: String) -> Result<TourId> {
+    pub fn create_tour(&mut self, title: String) -> Result<TourId> {
         let id = format!("{}", Uuid::new_v4().to_simple());
         let new_tour = Tour {
             protocol_version: "1.0".to_owned(),
@@ -236,15 +222,14 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
             repositories: HashMap::new(),
             generator: 0,
         };
-        self.get_tours_mut().insert(id.clone(), new_tour);
+        self.tours.insert(id.clone(), new_tour);
         Ok(id)
     }
 
-    pub fn open_tour(&self, path: PathBuf, edit: bool) -> Result<TourId> {
+    pub fn open_tour(&mut self, path: PathBuf, edit: bool) -> Result<TourId> {
         let tour = self.manager.load_tour(path)?;
-        let mut tours = self.get_tours_mut();
         let id = tour.id.clone();
-        tours.insert(tour.id.clone(), tour);
+        self.tours.insert(tour.id.clone(), tour);
         if edit {
             self.set_editable(id.clone(), true);
             self.refresh_tour(id.clone(), None)?;
@@ -252,13 +237,13 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         Ok(id)
     }
 
-    pub fn freeze_tour(&self, tour_id: TourId) -> Result<()> {
+    pub fn freeze_tour(&mut self, tour_id: TourId) -> Result<()> {
         self.set_editable(tour_id.clone(), false);
         self.reload_tour(tour_id)?;
         Ok(())
     }
 
-    pub fn unfreeze_tour(&self, tour_id: TourId) -> Result<()> {
+    pub fn unfreeze_tour(&mut self, tour_id: TourId) -> Result<()> {
         self.set_editable(tour_id.clone(), true);
         self.refresh_tour(tour_id, None)?;
         Ok(())
@@ -283,7 +268,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         })
     }
 
-    pub fn edit_tour_metadata(&self, tour_id: TourId, delta: TourMetadata) -> Result<()> {
+    pub fn edit_tour_metadata(&mut self, tour_id: TourId, delta: TourMetadata) -> Result<()> {
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into());
         }
@@ -292,7 +277,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         Ok(())
     }
 
-    pub fn refresh_tour(&self, tour_id: TourId, commit: Option<String>) -> Result<()> {
+    pub fn refresh_tour(&mut self, tour_id: TourId, commit: Option<String>) -> Result<()> {
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into());
         }
@@ -327,23 +312,22 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         Ok(())
     }
 
-    pub fn forget_tour(&self, tour_id: TourId) -> Result<()> {
-        let mut tours = self.get_tours_mut();
-        if !tours.contains_key(&tour_id) {
+    pub fn forget_tour(&mut self, tour_id: TourId) -> Result<()> {
+        if !self.tours.contains_key(&tour_id) {
             return Err(ErrorKind::NoTourWithID.attach("ID", tour_id));
         }
-        tours.remove(&tour_id);
+        self.tours.remove(&tour_id);
         Ok(())
     }
 
-    pub fn reload_tour(&self, tour_id: TourId) -> Result<()> {
+    pub fn reload_tour(&mut self, tour_id: TourId) -> Result<()> {
         let tour = self.manager.reload_tour(tour_id.clone())?;
-        self.tours.write().unwrap().insert(tour_id, tour);
+        self.tours.insert(tour_id, tour);
         Ok(())
     }
 
     pub fn create_stop(
-        &self,
+        &mut self,
         tour_id: TourId,
         title: String,
         path: PathBuf,
@@ -367,10 +351,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
             children: Vec::new(),
             broken: None,
         };
-        let mut tours = self.get_tours_mut();
-        let tour = tours
-            .get_mut(&tour_id)
-            .ok_or_else(|| ErrorKind::NoTourWithID.attach("ID", tour_id))?;
+        tourist_ref_mut!(self, tour_id, tour);
         tour.stops.push(stop);
         tour.repositories.insert(
             repo,
@@ -381,8 +362,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
 
     pub fn view_stop(&self, tour_id: TourId, stop_id: StopId) -> Result<StopView> {
         let view_stop_reference = |sr: &StopReference| -> Result<StopReferenceView> {
-            let tours = self.get_tours();
-            let other_tour = tours.get(&sr.tour_id);
+            let other_tour = self.tours.get(&sr.tour_id);
             if let Some(other_tour) = other_tour {
                 let (other_stop_id, other_stop_title) = if let Some(other_stop_id) = &sr.stop_id {
                     let other_stop = other_tour
@@ -426,7 +406,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
     }
 
     pub fn edit_stop_metadata(
-        &self,
+        &mut self,
         tour_id: TourId,
         stop_id: StopId,
         delta: StopMetadata,
@@ -440,7 +420,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
     }
 
     pub fn move_stop(
-        &self,
+        &mut self,
         tour_id: TourId,
         stop_id: StopId,
         path: PathBuf,
@@ -482,7 +462,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
     }
 
     pub fn reorder_stop(
-        &self,
+        &mut self,
         tour_id: TourId,
         stop_id: StopId,
         position_delta: isize,
@@ -519,7 +499,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
     }
 
     pub fn link_stop(
-        &self,
+        &mut self,
         tour_id: TourId,
         stop_id: StopId,
         other_tour_id: TourId,
@@ -537,7 +517,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
     }
 
     pub fn unlink_stop(
-        &self,
+        &mut self,
         tour_id: TourId,
         stop_id: StopId,
         other_tour_id: TourId,
@@ -586,7 +566,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         Ok(line.map(|l| (path.join_rel(&stop.path).as_path_buf().clone(), l)))
     }
 
-    pub fn remove_stop(&self, tour_id: TourId, stop_id: StopId) -> Result<()> {
+    pub fn remove_stop(&mut self, tour_id: TourId, stop_id: StopId) -> Result<()> {
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into());
         }
@@ -610,7 +590,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         Ok(())
     }
 
-    pub fn index_repository(&self, repo_name: String, path: Option<PathBuf>) -> Result<()> {
+    pub fn index_repository(&mut self, repo_name: String, path: Option<PathBuf>) -> Result<()> {
         if let Some(path) = path {
             let abs_path = AbsolutePathBuf::new(path.clone())
                 .ok_or_else(|| ErrorKind::ExpectedAbsolutePath.attach("Path", path.display()))?;
@@ -620,27 +600,28 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         }
     }
 
-    pub fn save_all(&self) -> Result<()> {
-        for tour in self.get_tours().values() {
+    pub fn save_all(&mut self) -> Result<()> {
+        for tour in self.tours.values() {
             if self.is_editable(&tour.id) {
-                self.manager.save_tour(tour.id.clone())?;
+                self.manager.save_tour(&tour)?;
             }
         }
         Ok(())
     }
 
-    pub fn save_tour(&self, tour_id: TourId, path: Option<PathBuf>) -> Result<()> {
+    pub fn save_tour(&mut self, tour_id: TourId, path: Option<PathBuf>) -> Result<()> {
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into());
         }
         if let Some(path) = path {
             self.manager.set_tour_path(tour_id.clone(), path);
         }
-        self.manager.save_tour(tour_id)?;
+        tourist_ref!(self, tour_id, tour);
+        self.manager.save_tour(&tour)?;
         Ok(())
     }
 
-    pub fn delete_tour(&self, tour_id: TourId) -> Result<()> {
+    pub fn delete_tour(&mut self, tour_id: TourId) -> Result<()> {
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into());
         }
