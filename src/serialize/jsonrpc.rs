@@ -219,10 +219,6 @@ pub trait TouristRpc {
     #[rpc(name = "save_tour")]
     fn rpc_save_tour(&self, tour_id: TourId, path: Option<PathBuf>) -> JsonResult<()>;
 
-    /// Save all available tours to disk. This will fail if any tours are new.
-    #[rpc(name = "save_all")]
-    fn rpc_save_all(&self) -> JsonResult<()>;
-
     /// Remove a tour from the tracker and delete it from disk.
     #[rpc(name = "delete_tour")]
     fn rpc_delete_tour(&self, tour_id: TourId) -> JsonResult<()>;

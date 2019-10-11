@@ -978,53 +978,6 @@ fn save_tour_test() {
 }
 
 #[test]
-fn save_all_test() {
-    let (mut tourist, _) = test_instance();
-    tourist.tours.insert(
-        "TOURID".to_owned(),
-        Tour {
-            generator: 0,
-            id: "TOURID".to_owned(),
-            title: "My first tour".to_owned(),
-            description: "".to_owned(),
-            stops: vec![Stop {
-                broken: None,
-                id: "STOPID".to_owned(),
-                title: "A stop on the tour".to_owned(),
-                description: "".to_owned(),
-                path: RelativePathBuf::from("foo/bar.txt".to_owned()),
-                repository: "my-repo".to_owned(),
-                line: 100,
-                children: vec![],
-            }],
-            protocol_version: "1.0".to_owned(),
-            repositories: vec![("my-repo".to_owned(), "OLD_COMMIT".to_owned())]
-                .into_iter()
-                .collect(),
-        },
-    );
-    tourist.set_editable("TOURID".to_owned(), true);
-
-    tourist
-        .manager
-        .path_map
-        .insert("TOURID".to_owned(), PathBuf::from("/foo/bar"));
-
-    tourist.save_all().unwrap();
-
-    assert_eq!(
-        tourist
-            .manager
-            .file_system
-            .borrow()
-            .get(&PathBuf::from("/foo/bar"))
-            .unwrap()
-            .id,
-        "TOURID"
-    );
-}
-
-#[test]
 fn delete_tour_test() {
     let (mut tourist, _) = test_instance();
     tourist.tours.insert(

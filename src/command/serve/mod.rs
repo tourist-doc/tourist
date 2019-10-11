@@ -220,10 +220,6 @@ impl<M: TourFileManager + Send + Sync + 'static, V: VCS, I: Index> TouristRpc
             .as_json_result()
     }
 
-    fn rpc_save_all(&self) -> JsonResult<()> {
-        self.write().unwrap().save_all().as_json_result()
-    }
-
     fn rpc_save_tour(&self, tour_id: TourId, path: Option<PathBuf>) -> JsonResult<()> {
         self.write()
             .unwrap()

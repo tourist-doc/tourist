@@ -600,15 +600,6 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         }
     }
 
-    pub fn save_all(&mut self) -> Result<()> {
-        for tour in self.tours.values() {
-            if self.is_editable(&tour.id) {
-                self.manager.save_tour(&tour)?;
-            }
-        }
-        Ok(())
-    }
-
     pub fn save_tour(&mut self, tour_id: TourId, path: Option<PathBuf>) -> Result<()> {
         if !self.is_editable(&tour_id) {
             return Err(ErrorKind::TourNotEditable.into());
