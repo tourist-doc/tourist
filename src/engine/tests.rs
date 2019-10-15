@@ -225,6 +225,11 @@ fn freeze_unfreeze_tour_test() {
 #[test]
 fn view_tour_test() {
     let mut tourist = test_instance();
+    let root = dirs::download_dir().unwrap();
+    tourist
+        .index
+        .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
+        .unwrap();
     tourist.tours.insert(
         "TOURID".to_owned(),
         Tour {
@@ -247,6 +252,8 @@ fn view_tour_test() {
                 .collect(),
         },
     );
+    tourist.vcs.last_changes = Some(Changes::new());
+
     let view = tourist.view_tour("TOURID".to_owned()).unwrap();
     assert_eq!(
         view,
@@ -256,6 +263,7 @@ fn view_tour_test() {
             stops: vec![("STOPID".to_owned(), "A stop on the tour".to_owned())],
             repositories: vec![("my-repo".to_owned(), "COMMIT".to_owned())],
             edit: false,
+            up_to_date: true,
         }
     );
     tourist.set_editable("TOURID".to_owned(), true);

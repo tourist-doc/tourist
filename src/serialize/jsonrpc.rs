@@ -65,6 +65,8 @@ pub struct TourView {
     pub repositories: Vec<(String, String)>,
     /// True if tour is currently in edit mode.
     pub edit: bool,
+    /// True if all repositories are up to date.
+    pub up_to_date: bool,
 }
 
 /// The main RPC interface provided by `tourist serve`.

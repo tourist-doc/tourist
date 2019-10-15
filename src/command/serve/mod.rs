@@ -51,6 +51,7 @@ impl<
             stops: view.stops,
             repositories: view.repositories,
             edit: view.edit,
+            up_to_date: view.up_to_date,
         })
     }
 

@@ -69,6 +69,8 @@ pub struct TourView {
     pub repositories: Vec<(String, String)>,
     /// True if tour is currently in edit mode.
     pub edit: bool,
+    /// True if all repositories are up to date.
+    pub up_to_date: bool,
 }
 
 pub struct Engine<M: TourFileManager, V: VCS, I: Index> {
@@ -248,6 +250,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
             edit: self.is_editable(&tour_id),
+            up_to_date: self.is_up_to_date(&tour_id)?,
         })
     }
 
