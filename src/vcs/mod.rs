@@ -22,7 +22,7 @@ pub trait VCS {
 
     fn is_workspace_dirty(&self, repo_path: AbsolutePath<'_>) -> Result<bool>;
 
-    fn checkout_version(&self, repo_path: AbsolutePath<'_>, to: &str) -> Result<()>;
+    fn checkout_version(&self, repo_path: AbsolutePath<'_>, to: &str) -> Result<String>;
 
     fn lookup_file_bytes(
         &self,
@@ -176,10 +176,11 @@ impl VCS for Git {
         Ok(!changes.is_empty())
     }
 
-    fn checkout_version(&self, repo_path: AbsolutePath<'_>, to: &str) -> Result<()> {
+    fn checkout_version(&self, repo_path: AbsolutePath<'_>, to: &str) -> Result<String> {
         if self.is_workspace_dirty(repo_path)? {
             return Err(ErrorKind::WorkspaceIsDirty.into());
         }
+        let old_version = self.get_current_version(repo_path)?;
         let repo = Repository::open(repo_path.as_path()).map_err(|_| {
             ErrorKind::InvalidRepositoryPath
                 .attach("repo_path", format!("{}", repo_path.as_path().display()))
@@ -192,7 +193,7 @@ impl VCS for Git {
             .context(ErrorKind::FailedToCheckOutRepository)?;
         repo.set_head_detached(oid)
             .context(ErrorKind::FailedToCheckOutRepository)?;
-        Ok(())
+        Ok(old_version)
     }
 
     fn diff_with_version(

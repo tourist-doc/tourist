@@ -707,13 +707,32 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
             &tour_id,
         );
         tourist_ref!(self, tour_id, tour);
+        let mut rollbacks = HashMap::new();
         for (repo_name, version) in tour.repositories.iter() {
             let path = self
                 .index
                 .get(&repo_name)?
                 .ok_or_else(|| ErrorKind::RepositoryNotInIndex.attach("repo", repo_name.clone()))?;
-            self.vcs
-                .checkout_version(path.as_absolute_path(), &version)?;
+            match self.vcs.checkout_version(path.as_absolute_path(), &version) {
+                Ok(old) => {
+                    rollbacks.insert(path.clone(), old);
+                }
+                Err(e) => {
+                    // Before throwing the error, make sure to roll back
+                    for (p, old) in rollbacks.iter() {
+                        // Roll back, this shouldn't fail
+                        self.vcs
+                            .checkout_version(p.as_absolute_path(), &old)
+                            .unwrap_or_else(|_| {
+                                panic!(format!(
+                                    "failed while trying to restore git state\n{:?}",
+                                    &rollbacks,
+                                ))
+                            });
+                    }
+                    return Err(e);
+                }
+            }
         }
         Ok(())
     }

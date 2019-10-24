@@ -82,8 +82,8 @@ impl VCS for MockVCS {
         Ok(self.last_changes.clone().unwrap())
     }
 
-    fn checkout_version(&self, _repo_version: AbsolutePath<'_>, _to: &str) -> Result<()> {
-        Ok(())
+    fn checkout_version(&self, _repo_version: AbsolutePath<'_>, to: &str) -> Result<String> {
+        Ok(to.to_owned())
     }
 
     fn lookup_file_bytes(
