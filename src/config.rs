@@ -98,8 +98,8 @@ mod tests {
     fn write_basic_tour(path: &Path) {
         // This is super hacky, but it doesn't need to be robust. This is just to make sure I can
         // create tour files arbitrarily far down a potentially non-existant directory tree.
-        if !path.parent().unwrap().exists() {
-            fs::create_dir_all(path.parent().unwrap()).unwrap();
+        if !path.parent().expect("no parent").exists() {
+            fs::create_dir_all(path.parent().expect("no parent")).expect("could not create dir");
         }
         fs::write(
             path,
@@ -111,19 +111,19 @@ mod tests {
                 protocol_version: "1.0".to_owned(),
                 repositories: vec![].into_iter().collect(),
             })
-            .unwrap(),
+            .expect("failed to serialize"),
         )
-        .unwrap();
+        .expect("failed to write");
     }
 
     #[test]
     fn collect_tours_works() {
-        let temp_dir = TempDir::new("collect_tours_works").unwrap();
+        let temp_dir = TempDir::new("collect_tours_works").expect("TempDir failed");
         write_basic_tour(&temp_dir.path().join("example.tour"));
         let tours = collect_tours(vec![
-            AbsolutePathBuf::new(temp_dir.path().to_path_buf()).unwrap()
+            AbsolutePathBuf::new(temp_dir.path().to_path_buf()).expect("not absolute")
         ])
-        .unwrap();
+        .expect("collect failed");
         assert_eq!(tours[0].0.title, "My first tour");
         assert_eq!(tours[0].0.stops.len(), 0);
 
@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn collect_tours_recursively() {
-        let temp_dir = TempDir::new("collect_tours_recursive").unwrap();
+        let temp_dir = TempDir::new("collect_tours_recursive").expect("TempDir failed");
         write_basic_tour(&temp_dir.path().join("example1.tour"));
         write_basic_tour(&temp_dir.path().join("between").join("example2.tour"));
         write_basic_tour(
@@ -143,8 +143,10 @@ mod tests {
                 .join("example3.tour"),
         );
         write_basic_tour(&temp_dir.path().join("between").join("example4.tour"));
-        let tours =
-            collect_tours(vec![AbsolutePathBuf::new(temp_dir.into_path()).unwrap()]).unwrap();
+        let tours = collect_tours(vec![
+            AbsolutePathBuf::new(temp_dir.into_path()).expect("not absolute")
+        ])
+        .expect("collect failed");
         assert_eq!(tours.len(), 4);
     }
 }

@@ -39,8 +39,11 @@ impl Changes {
     }
 
     pub fn process_line(&mut self, e: DiffLineEvent) {
-        let from = e.from.map(|v| v.try_into().unwrap());
-        let to = e.to.map(|v| v.try_into().unwrap());
+        let from = e
+            .from
+            .map(|v| v.try_into().expect("could not convert u32 to usize"));
+        let to =
+            e.to.map(|v| v.try_into().expect("could not convert u32 to usize"));
         self.0.entry(e.key).and_modify(|m| {
             match (from, to) {
                 (Some(from), Some(to)) => m.line_moved(from, to),

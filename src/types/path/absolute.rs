@@ -66,7 +66,14 @@ impl<'a> AbsolutePath<'a> {
     }
 
     fn components(&self) -> impl Iterator<Item = &str> {
-        self.0.components().map(|c| c.as_os_str().to_str().unwrap())
+        self.0.components().map(|c| {
+            c.as_os_str().to_str().unwrap_or_else(|| {
+                panic!(format!(
+                    "path component {:?} invalid unicode",
+                    c.as_os_str(),
+                ));
+            })
+        })
     }
 }
 
@@ -78,7 +85,10 @@ mod tests {
 
     #[test]
     fn create_abs_path() {
-        let abs = dirs::home_dir().unwrap().join("some").join("path");
+        let abs = dirs::home_dir()
+            .expect("no home dir")
+            .join("some")
+            .join("path");
         let not_abs = Path::new("some").join("path");
         assert!(AbsolutePathBuf::new(abs).is_some());
         assert!(AbsolutePathBuf::new(not_abs).is_none());
@@ -87,10 +97,15 @@ mod tests {
     #[test]
     fn simple_try_relative() {
         // Relativize $HOME/some/path/and/more from $HOME/some/path, expect and/more
-        let root =
-            AbsolutePathBuf::new(dirs::home_dir().unwrap().join("some").join("path")).unwrap();
-        let path =
-            AbsolutePathBuf::new(root.as_path_buf().clone().join("and").join("more")).unwrap();
+        let root = AbsolutePathBuf::new(
+            dirs::home_dir()
+                .expect("no home dir")
+                .join("some")
+                .join("path"),
+        )
+        .expect("path not absolute");
+        let path = AbsolutePathBuf::new(root.as_path_buf().clone().join("and").join("more"))
+            .expect("path not absolute");
         assert_eq!(
             Some(RelativePathBuf::from_components(
                 vec!["and".to_owned(), "more".to_owned()].into_iter()
@@ -102,10 +117,20 @@ mod tests {
     #[test]
     fn unrelated_try_relative() {
         // Relativize $DOWNLOADS/other/thing from $HOME/some/path, expect <none>
-        let root =
-            AbsolutePathBuf::new(dirs::home_dir().unwrap().join("some").join("path")).unwrap();
-        let path = AbsolutePathBuf::new(dirs::download_dir().unwrap().join("other").join("thing"))
-            .unwrap();
+        let root = AbsolutePathBuf::new(
+            dirs::home_dir()
+                .expect("no home dir")
+                .join("some")
+                .join("path"),
+        )
+        .expect("path not absolute");
+        let path = AbsolutePathBuf::new(
+            dirs::download_dir()
+                .expect("no download dir")
+                .join("other")
+                .join("thing"),
+        )
+        .expect("path not absolute");
         assert!(path.try_relative(root.as_absolute_path()).is_none());
     }
 
@@ -114,29 +139,34 @@ mod tests {
         // Relativize $HOME/some/path/foo from $HOME/some/path/bar, expect <none>
         let root = AbsolutePathBuf::new(
             dirs::home_dir()
-                .unwrap()
+                .expect("no home dir")
                 .join("some")
                 .join("path")
                 .join("foo"),
         )
-        .unwrap();
+        .expect("path not absolute");
         let path = AbsolutePathBuf::new(
             dirs::home_dir()
-                .unwrap()
+                .expect("no home dir")
                 .join("some")
                 .join("path")
                 .join("bar"),
         )
-        .unwrap();
+        .expect("path not absolute");
         assert!(path.try_relative(root.as_absolute_path()).is_none());
     }
 
     #[test]
     fn empty_try_relative() {
         // Relativize $HOME/some/path from $HOME/some/path, expect <empty>
-        let root =
-            AbsolutePathBuf::new(dirs::home_dir().unwrap().join("some").join("path")).unwrap();
-        let path = AbsolutePathBuf::new(root.as_path_buf().clone()).unwrap();
+        let root = AbsolutePathBuf::new(
+            dirs::home_dir()
+                .expect("no home dir")
+                .join("some")
+                .join("path"),
+        )
+        .expect("path not absolute");
+        let path = AbsolutePathBuf::new(root.as_path_buf().clone()).expect("path not absolute");
         assert_eq!(
             Some(RelativePathBuf::from_components(vec![].into_iter())),
             path.try_relative(root.as_absolute_path()),
@@ -146,9 +176,15 @@ mod tests {
     #[test]
     fn file_try_relative() {
         // Relativize $HOME/some/path/foo.txt from $HOME/some/path, expect foo.txt
-        let root =
-            AbsolutePathBuf::new(dirs::home_dir().unwrap().join("some").join("path")).unwrap();
-        let path = AbsolutePathBuf::new(root.as_path_buf().clone().join("foo.txt")).unwrap();
+        let root = AbsolutePathBuf::new(
+            dirs::home_dir()
+                .expect("no home dir")
+                .join("some")
+                .join("path"),
+        )
+        .expect("path not absolute");
+        let path = AbsolutePathBuf::new(root.as_path_buf().clone().join("foo.txt"))
+            .expect("path not absolute");
         assert_eq!(
             Some(RelativePathBuf::from_components(
                 vec!["foo.txt".to_owned()].into_iter()

@@ -250,33 +250,33 @@ mod tests {
 
     #[test]
     fn simple_diffs_work() {
-        let repo_dir = TempDir::new("my_repo").unwrap().into_path();
-        let repo = Repository::init(&repo_dir).unwrap();
+        let repo_dir = TempDir::new("my_repo").expect("TempDir fail").into_path();
+        let repo = Repository::init(&repo_dir).expect("could not init repo");
 
         let file1 = repo_dir.join("test.txt");
         let file2 = repo_dir.join("test2.txt");
 
-        fs::write(&file1, "Hello, world!\nSomething else").unwrap();
-        fs::write(&file2, "1\n2\n3").unwrap();
+        fs::write(&file1, "Hello, world!\nSomething else").expect("write fail");
+        fs::write(&file2, "1\n2\n3").expect("write fail");
 
-        let oid = add_all(&repo).unwrap();
-        let from_id = commit(&repo, oid, "commit 1").unwrap();
+        let oid = add_all(&repo).expect("add fail");
+        let from_id = commit(&repo, oid, "commit 1").expect("commit fail");
 
-        fs::write(&file1, "Poop\nHello, world!\nGoodbye, world!").unwrap();
-        fs::write(&file2, "2\n3\n4").unwrap();
+        fs::write(&file1, "Poop\nHello, world!\nGoodbye, world!").expect("write fail");
+        fs::write(&file2, "2\n3\n4").expect("write fail");
 
-        let oid = add_all(&repo).unwrap();
-        let to_id = commit(&repo, oid, "commit 2").unwrap();
+        let oid = add_all(&repo).expect("add fail");
+        let to_id = commit(&repo, oid, "commit 2").expect("commit fail");
 
         let changes = Git
             .diff_with_version(
                 AbsolutePathBuf::new(repo_dir.clone())
-                    .unwrap()
+                    .expect("simple_diffs_work crash")
                     .as_absolute_path(),
                 &format!("{:?}", from_id),
                 &format!("{:?}", to_id),
             )
-            .unwrap();
+            .expect("diff failed");
 
         assert_eq!(
             Some(&FileChanges::Changed {
@@ -299,31 +299,34 @@ mod tests {
 
     #[test]
     fn can_check_out() {
-        let repo_dir = TempDir::new("my_repo").unwrap().into_path();
-        let repo = Repository::init(&repo_dir).unwrap();
+        let repo_dir = TempDir::new("my_repo").expect("TempDir fail").into_path();
+        let repo = Repository::init(&repo_dir).expect("repo init fail");
 
         dbg!(&repo_dir);
 
         let file = repo_dir.join("test.txt");
 
-        fs::write(&file, "Hello, world!").unwrap();
+        fs::write(&file, "Hello, world!").expect("write fail");
 
-        let oid = add_all(&repo).unwrap();
-        let first_id = commit(&repo, oid, "commit 1").unwrap();
+        let oid = add_all(&repo).expect("add fail");
+        let first_id = commit(&repo, oid, "commit 1").expect("commit fail");
 
-        fs::write(&file, "Goodbye world!").unwrap();
+        fs::write(&file, "Goodbye world!").expect("write fail");
 
-        let oid = add_all(&repo).unwrap();
-        let _ = commit(&repo, oid, "commit 2").unwrap();
+        let oid = add_all(&repo).expect("add fail");
+        let _ = commit(&repo, oid, "commit 2").expect("commit fail");
 
         Git.checkout_version(
             AbsolutePathBuf::new(repo_dir.clone())
-                .unwrap()
+                .expect("path not absolute")
                 .as_absolute_path(),
             &oid_to_string(first_id),
         )
         .expect("checkout failed for some reason");
 
-        assert_eq!(fs::read_to_string(&file).unwrap(), "Hello, world!");
+        assert_eq!(
+            fs::read_to_string(&file).expect("read fail"),
+            "Hello, world!"
+        );
     }
 }

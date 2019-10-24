@@ -39,7 +39,11 @@ mod tests {
     #[test]
     fn round_trip() {
         fn rt(t: Tour) -> TestResult {
-            TestResult::from_bool(parse_tour(&serialize_tour(t.clone()).unwrap()).unwrap() == t)
+            TestResult::from_bool(
+                parse_tour(&serialize_tour(t.clone()).expect("serialize fail"))
+                    .expect("parse fail")
+                    == t,
+            )
         }
         QuickCheck::with_gen(StdThreadGen::new(10))
             .tests(100)

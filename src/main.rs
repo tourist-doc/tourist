@@ -143,7 +143,7 @@ fn main() {
             .write(true)
             .truncate(true)
             .open(log_path)
-            .unwrap();
+            .unwrap_or_else(|_| panic!(format!("failed to open log file {}", log_path)));
 
         slog::Logger::root(
             slog_term::FullFormat::new(slog_term::PlainSyncDecorator::new(file))
