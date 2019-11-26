@@ -9,10 +9,11 @@ use crate::vcs::VCS;
 use jsonrpc_core;
 use jsonrpc_core::Result as JsonResult;
 use jsonrpc_stdio_server::ServerBuilder;
+use parking_lot::RwLock;
 use slog_scope::info;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 impl<
         M: TourFileManager + Send + Sync + 'static,
@@ -21,46 +22,27 @@ impl<
     > TouristRpc for Arc<RwLock<Engine<M, V, I>>>
 {
     fn rpc_list_tours(&self) -> JsonResult<Vec<(TourId, String)>> {
-        self.read()
-            .expect("tried to read but lock was poisoned")
-            .list_tours()
-            .as_json_result()
+        self.read().list_tours().as_json_result()
     }
 
     fn rpc_create_tour(&self, title: String) -> JsonResult<TourId> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .create_tour(title)
-            .as_json_result()
+        self.write().create_tour(title).as_json_result()
     }
 
     fn rpc_open_tour(&self, path: PathBuf, edit: bool) -> JsonResult<TourId> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .open_tour(path, edit)
-            .as_json_result()
+        self.write().open_tour(path, edit).as_json_result()
     }
 
     fn rpc_freeze_tour(&self, tour_id: TourId) -> JsonResult<()> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .freeze_tour(tour_id)
-            .as_json_result()
+        self.write().freeze_tour(tour_id).as_json_result()
     }
 
     fn rpc_unfreeze_tour(&self, tour_id: TourId) -> JsonResult<()> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .unfreeze_tour(tour_id)
-            .as_json_result()
+        self.write().unfreeze_tour(tour_id).as_json_result()
     }
 
     fn rpc_view_tour(&self, tour_id: TourId) -> JsonResult<jsonrpc::TourView> {
-        let view = self
-            .read()
-            .expect("tried to read but lock was poisoned")
-            .view_tour(tour_id)
-            .as_json_result()?;
+        let view = self.read().view_tour(tour_id).as_json_result()?;
         Ok(jsonrpc::TourView {
             title: view.title,
             description: view.description,
@@ -81,30 +63,20 @@ impl<
             description: delta.description,
         };
         self.write()
-            .expect("tried to write but lock was poisoned")
             .edit_tour_metadata(tour_id, delta)
             .as_json_result()
     }
 
     fn rpc_refresh_tour(&self, tour_id: TourId) -> JsonResult<()> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .refresh_tour(tour_id)
-            .as_json_result()
+        self.write().refresh_tour(tour_id).as_json_result()
     }
 
     fn rpc_forget_tour(&self, tour_id: TourId) -> JsonResult<()> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .forget_tour(tour_id)
-            .as_json_result()
+        self.write().forget_tour(tour_id).as_json_result()
     }
 
     fn rpc_reload_tour(&self, tour_id: TourId) -> JsonResult<()> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .reload_tour(tour_id)
-            .as_json_result()
+        self.write().reload_tour(tour_id).as_json_result()
     }
 
     fn rpc_create_stop(
@@ -115,17 +87,12 @@ impl<
         line: usize,
     ) -> JsonResult<StopId> {
         self.write()
-            .expect("tried to write but lock was poisoned")
             .create_stop(tour_id, title, path, line)
             .as_json_result()
     }
 
     fn rpc_view_stop(&self, tour_id: TourId, stop_id: StopId) -> JsonResult<jsonrpc::StopView> {
-        let view = self
-            .read()
-            .expect("tried to read but lock was poisoned")
-            .view_stop(tour_id, stop_id)
-            .as_json_result()?;
+        let view = self.read().view_stop(tour_id, stop_id).as_json_result()?;
         Ok(jsonrpc::StopView {
             title: view.title,
             description: view.description,
@@ -164,7 +131,6 @@ impl<
             description: delta.description,
         };
         self.write()
-            .expect("tried to write but lock was poisoned")
             .edit_stop_metadata(tour_id, stop_id, delta)
             .as_json_result()
     }
@@ -177,7 +143,6 @@ impl<
         line: usize,
     ) -> JsonResult<()> {
         self.write()
-            .expect("tried to write but lock was poisoned")
             .move_stop(tour_id, stop_id, path, line)
             .as_json_result()
     }
@@ -189,7 +154,6 @@ impl<
         position_delta: isize,
     ) -> JsonResult<()> {
         self.write()
-            .expect("tried to write but lock was poisoned")
             .reorder_stop(tour_id, stop_id, position_delta)
             .as_json_result()
     }
@@ -202,7 +166,6 @@ impl<
         other_stop_id: Option<StopId>,
     ) -> JsonResult<()> {
         self.write()
-            .expect("tried to write but lock was poisoned")
             .link_stop(tour_id, stop_id, other_tour_id, other_stop_id)
             .as_json_result()
     }
@@ -215,7 +178,6 @@ impl<
         other_stop_id: Option<StopId>,
     ) -> JsonResult<()> {
         self.write()
-            .expect("tried to write but lock was poisoned")
             .unlink_stop(tour_id, stop_id, other_tour_id, other_stop_id)
             .as_json_result()
     }
@@ -227,44 +189,30 @@ impl<
         naive: bool,
     ) -> JsonResult<Option<(PathBuf, usize)>> {
         self.read()
-            .expect("tried to read but lock was poisoned")
             .locate_stop(tour_id, stop_id, naive)
             .as_json_result()
     }
 
     fn rpc_remove_stop(&self, tour_id: TourId, stop_id: StopId) -> JsonResult<()> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .remove_stop(tour_id, stop_id)
-            .as_json_result()
+        self.write().remove_stop(tour_id, stop_id).as_json_result()
     }
 
     fn rpc_index_repository(&self, repo_name: String, path: Option<PathBuf>) -> JsonResult<()> {
         self.write()
-            .expect("tried to write but lock was poisoned")
             .index_repository(repo_name, path)
             .as_json_result()
     }
 
     fn rpc_save_tour(&self, tour_id: TourId, path: Option<PathBuf>) -> JsonResult<()> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .save_tour(tour_id, path)
-            .as_json_result()
+        self.write().save_tour(tour_id, path).as_json_result()
     }
 
     fn rpc_delete_tour(&self, tour_id: TourId) -> JsonResult<()> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .delete_tour(tour_id)
-            .as_json_result()
+        self.write().delete_tour(tour_id).as_json_result()
     }
 
     fn rpc_checkout_for_tour(&self, tour_id: TourId) -> JsonResult<()> {
-        self.write()
-            .expect("tried to write but lock was poisoned")
-            .checkout_for_tour(tour_id)
-            .as_json_result()
+        self.write().checkout_for_tour(tour_id).as_json_result()
     }
 }
 
