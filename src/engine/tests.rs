@@ -5,7 +5,6 @@ use crate::index::Index;
 use crate::types::path::{AbsolutePath, AbsolutePathBuf, RelativePathBuf};
 use crate::types::{Stop, StopReference, Tour};
 use crate::vcs::{Changes, FileChanges, LineChanges, VCS};
-use dirs;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -225,7 +224,7 @@ fn freeze_unfreeze_tour_test() {
 #[test]
 fn view_tour_test() {
     let mut tourist = test_instance();
-    let root = dirs::download_dir().unwrap();
+    let root = std::env::current_dir().unwrap();
     tourist
         .index
         .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
@@ -384,7 +383,7 @@ fn reload_tour_test() {
 #[test]
 fn create_stop_test() {
     let mut tourist = test_instance();
-    let root = dirs::download_dir().unwrap();
+    let root = std::env::current_dir().unwrap();
     tourist
         .index
         .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
@@ -781,7 +780,7 @@ fn unlink_stop_test() {
 #[test]
 fn locate_stop_test() {
     let mut tourist = test_instance();
-    let root = dirs::download_dir().unwrap();
+    let root = std::env::current_dir().unwrap();
     tourist
         .index
         .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
@@ -873,7 +872,7 @@ fn remove_stop_test() {
 #[test]
 fn refresh_tour_test() {
     let mut tourist = test_instance();
-    let root = dirs::download_dir().unwrap();
+    let root = std::env::current_dir().unwrap();
     tourist
         .index
         .set("my-repo", &AbsolutePathBuf::new(root.join("foo")).unwrap())
@@ -1002,7 +1001,7 @@ fn delete_tour_test() {
 #[test]
 fn index_repository_test() {
     let mut tourist = test_instance();
-    let root = dirs::download_dir().unwrap();
+    let root = std::env::current_dir().unwrap();
     tourist
         .index_repository("my-repo".to_owned(), Some(root.join("foo")))
         .unwrap();

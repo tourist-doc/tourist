@@ -13,9 +13,11 @@ use std::path::PathBuf;
 fn config_path() -> PathBuf {
     if let Ok(p) = dotenv::var("TOURIST_CONFIG") {
         PathBuf::from(p)
+    } else if let Some(home_path) = dirs::home_dir() {
+        home_path.join(".tourist")
     } else {
-        dirs::home_dir()
-            .expect("Operating system does not have a home directory.")
+        std::env::current_dir()
+            .expect("cannot get application working directory")
             .join(".tourist")
     }
 }
