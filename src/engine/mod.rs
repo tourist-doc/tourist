@@ -164,7 +164,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
             .ok_or_else(|| ErrorKind::ExpectedAbsolutePath.attach("Path", path.display()))?;
         for (repo_name, repo_path) in self.index.all()? {
             if let Some(rel) = deep.try_relative(repo_path.as_absolute_path()) {
-                return Ok((rel, repo_name.to_owned(), repo_path.clone()));
+                return Ok((rel, repo_name, repo_path));
             }
         }
         Err(ErrorKind::NoRepositoryForFile.attach("Path", path.display()))
@@ -226,7 +226,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
             "called Engine::unfreeze_tour with args: {{ tour_id: {} }}",
             &tour_id,
         );
-        self.set_editable(tour_id.clone(), true);
+        self.set_editable(tour_id, true);
         Ok(())
     }
 
@@ -401,8 +401,8 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
                 Ok(StopReferenceView::Tracked {
                     tour_id: sr.tour_id.clone(),
                     tour_title: other_tour.title.clone(),
-                    stop_id: other_stop_id.clone(),
-                    stop_title: other_stop_title.clone(),
+                    stop_id: other_stop_id,
+                    stop_title: other_stop_title,
                 })
             } else {
                 Ok(StopReferenceView::Untracked {
@@ -643,7 +643,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
             // No change in length means that the stop was not deleted successfully
             return Err(ErrorKind::NoStopWithID
                 .attach("Tour ID", tour_id.clone())
-                .attach("Stop ID", stop_id.clone()));
+                .attach("Stop ID", stop_id));
         }
         // Remove any unncessary repos
         let used_repos = tour

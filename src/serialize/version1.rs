@@ -1,6 +1,5 @@
 use crate::types;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;

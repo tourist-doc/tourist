@@ -2,10 +2,8 @@ use crate::error::{ErrorKind, Result};
 use crate::serialize;
 use crate::types::path::AbsolutePathBuf;
 use crate::types::Tour;
-use dotenv;
 use failure::ResultExt;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use slog_scope::error;
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -57,7 +55,7 @@ pub struct Config {
 
 pub fn get_default_tours() -> Result<Vec<(Tour, PathBuf)>> {
     let config: Config = config();
-    collect_tours(config.dirs.clone())
+    collect_tours(config.dirs)
 }
 
 fn collect_tours(mut stack: Vec<AbsolutePathBuf>) -> Result<Vec<(Tour, PathBuf)>> {

@@ -1,6 +1,5 @@
 use crate::types::Tour;
 use serde::Deserialize;
-use serde_json;
 
 pub mod jsonrpc;
 pub mod version1;

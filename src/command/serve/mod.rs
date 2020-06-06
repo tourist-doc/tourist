@@ -6,7 +6,6 @@ use crate::serialize::jsonrpc;
 use crate::serialize::jsonrpc::TouristRpc;
 use crate::types::Tour;
 use crate::vcs::VCS;
-use jsonrpc_core;
 use jsonrpc_core::Result as JsonResult;
 use jsonrpc_stdio_server::ServerBuilder;
 use parking_lot::RwLock;

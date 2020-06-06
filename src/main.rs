@@ -1,7 +1,5 @@
 use failure::ResultExt;
-use slog;
 use slog::{o, Drain};
-use slog_term;
 use std::fs;
 use std::path::PathBuf;
 use std::process;

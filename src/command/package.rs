@@ -7,7 +7,6 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use zip;
 
 pub struct Package<V: VCS, I: Index> {
     vcs: V,
