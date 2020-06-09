@@ -164,6 +164,7 @@ fn create_tour_test() {
     let tour = tourist.tours.get(&id).expect("Tour not found");
     assert_eq!(tour.id, id);
     assert_eq!(tour.title, "My first tour");
+    assert!(tourist.is_editable(&tour.id))
 }
 
 #[test]

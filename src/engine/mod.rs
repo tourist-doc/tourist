@@ -195,6 +195,7 @@ impl<M: TourFileManager, V: VCS, I: Index> Engine<M, V, I> {
         };
         debug!("new tour with id: {}", &id);
         self.tours.insert(id.clone(), new_tour);
+        self.set_editable(id.clone(), true);
         Ok(id)
     }
 
